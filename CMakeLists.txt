@@ -31,7 +31,9 @@ add_library(cadical STATIC IMPORTED)
 set_target_properties(cadical PROPERTIES IMPORTED_LOCATION "${CADICAL_BINARY_DIR}/libcadical.a")
 add_dependencies(cadical cadical_build)
 
-add_executable(geyser src/main.cpp)
+add_executable(geyser src/main.cpp
+        src/formula.cpp
+        src/transition_system.cpp)
 
 target_link_libraries(geyser PUBLIC aiger)
 target_link_libraries(geyser PUBLIC cadical)

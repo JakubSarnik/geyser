@@ -3,6 +3,6 @@
 namespace geyser
 {
 
-literal::separator{ 0 };
+literal literal::separator{ 0 };
 
 }

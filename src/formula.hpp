@@ -100,3 +100,12 @@ public:
 };
 
 } // namespace geyser
+
+template<>
+struct std::hash< geyser::variable >
+{
+    std::size_t operator()( geyser::variable var ) const noexcept
+    {
+        return std::hash< int >{}( var.id() );
+    }
+};

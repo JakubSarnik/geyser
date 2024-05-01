@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <cassert>
 #include <cmath>
 
@@ -22,7 +23,11 @@ class variable
 
 public:
     [[nodiscard]] int id() const { return _id; }
+
+    friend auto operator<=>( variable, variable ) = default;
 };
+
+using valuation = std::unordered_map< variable, bool >;
 
 class literal
 {
@@ -43,6 +48,8 @@ public:
     [[nodiscard]] int value() const { return _value; }
     [[nodiscard]] variable var() const { return variable{ std::abs( _value ) }; }
     [[nodiscard]] bool sign() const { return _value >= 0; }
+
+    friend auto operator<=>( literal, literal ) = default;
 };
 
 class variable_store
@@ -76,8 +83,6 @@ class cnf_formula
     std::vector< literal > _literals;
 
 public:
-    // TODO: It may make sense to sort the added clause here according to the
-    //       variable id for faster substitutions. Investigate.
     void add_clause( const std::vector< literal >& clause )
     {
         _literals.reserve( _literals.size() + clause.size() + 1 );
@@ -90,6 +95,8 @@ public:
         _literals.reserve( _literals.size() + formula._literals.size() );
         _literals.insert( _literals.end(), formula._literals.cbegin(), formula._literals.cend() );
     }
+
+    [[nodiscard]] const std::vector< literal >& literals() const { return _literals; }
 };
 
 } // namespace geyser

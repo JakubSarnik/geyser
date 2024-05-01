@@ -33,10 +33,14 @@ add_dependencies(cadical cadical_build)
 
 add_executable(geyser src/main.cpp
         src/formula.cpp
-        src/transition_system.cpp)
+        src/transition_system.cpp
+        src/options.cpp
+        src/engine/base.cpp
+        src/engine/bmc.cpp)
 
 target_link_libraries(geyser PUBLIC aiger)
 target_link_libraries(geyser PUBLIC cadical)
 
+target_include_directories(geyser PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(geyser PUBLIC "${AIGER_HEADER_DIR}")
 target_include_directories(geyser PUBLIC "${CADICAL_HEADER_DIR}")

@@ -3,3 +3,6 @@
 
 # CMake build output
 cmake-build-*/
+
+# Testing benchmarks
+benchmarks/

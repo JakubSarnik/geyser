@@ -35,7 +35,7 @@ class engine
 public:
     virtual ~engine() = default;
 
-    virtual result run( const transition_system& system, options opts ) = 0;
+    virtual result run( const transition_system& system, const options& opts ) = 0;
 };
 
 } // namespace geyser

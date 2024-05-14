@@ -1,22 +1,25 @@
+#include "options.hpp"
+#include "caiger.hpp"
 #include <iostream>
+#include <memory>
 
-#include "cadical.hpp"
+int main( int argc, char** argv ) {
+    auto opts = geyser::parse_cli( argc, argv );
 
-int main() {
-    std::cout << "Hello, CaDiCaL!\n";
+    auto aig = std::unique_ptr< aiger, decltype( &aiger_reset ) >( aiger_init(), &aiger_reset );
 
-    auto solver = CaDiCaL::Solver{};
+    const char* msg = nullptr;
 
-    int tie = 1;
-    int shirt = 2;
+    if ( opts.input_file.has_value() )
+        msg = aiger_open_and_read_from_file( aig.get(), opts.input_file->c_str() );
+    else
+        msg = aiger_read_from_file( aig.get(), stdin );
 
-    solver.add (-tie), solver.add (shirt), solver.add (0);
-    solver.add (tie), solver.add (shirt), solver.add (0);
-    solver.add (-tie), solver.add (-shirt), solver.add (0);
-
-    int res = solver.solve();
-
-    std::cout << "Result: " << res << "\n";
+    if ( msg != nullptr )
+    {
+        std::cerr << "error: " << msg << "\n";
+        return 1;
+    }
 
     return 0;
 }

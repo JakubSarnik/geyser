@@ -31,12 +31,14 @@ add_library(cadical STATIC IMPORTED)
 set_target_properties(cadical PROPERTIES IMPORTED_LOCATION "${CADICAL_BINARY_DIR}/libcadical.a")
 add_dependencies(cadical cadical_build)
 
+# TODO: Reorder this once a structure is clearly established.
 add_executable(geyser src/main.cpp
         src/formula.cpp
         src/transition_system.cpp
         src/options.cpp
         src/engine/base.cpp
-        src/engine/bmc.cpp)
+        src/engine/bmc.cpp
+        src/aiger_builder.cpp)
 
 target_link_libraries(geyser PUBLIC aiger)
 target_link_libraries(geyser PUBLIC cadical)

@@ -1,6 +1,3 @@
 #include "transition_system.hpp"
 
-namespace geyser
-{
-
-} // namespace geyser
+// TODO: Delete if not needed

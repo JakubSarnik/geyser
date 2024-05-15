@@ -36,7 +36,11 @@ class literal
     explicit literal( int value ) : _value{ value } {}
 
 public:
-    explicit literal( variable var ) : _value{ var.id() } {}
+    explicit literal( variable var, bool negated = false ) : _value{ var.id() }
+    {
+        if ( negated )
+            _value *= -1;
+    }
 
     static literal separator;
 
@@ -88,6 +92,21 @@ public:
         _literals.reserve( _literals.size() + clause.size() + 1 );
         _literals.insert( _literals.end(), clause.cbegin(), clause.cend() );
         _literals.push_back( literal::separator );
+    }
+
+    void add_clause( literal l1 )
+    {
+        add_clause( std::vector{ l1 } );
+    }
+
+    void add_clause( literal l1, literal l2 )
+    {
+        add_clause( std::vector{ l1, l2 } );
+    }
+
+    void add_clause( literal l1, literal l2, literal l3 )
+    {
+        add_clause( std::vector{ l1, l2, l3 } );
     }
 
     void add_cnf( const cnf_formula& formula )

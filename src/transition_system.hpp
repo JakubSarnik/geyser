@@ -14,6 +14,9 @@ class transition_system
     // The variables have to be stored in successive sequential order (i.e., if
     // _state_vars begins with variable 3 and stores 4 variables, it contains
     // 3, 4, 5, 6). This is necessary for quick substitutions.
+    // TODO: Unless we store more than just the ID in the variable handle, we
+    //       should change the vectors to simple integer ranges! (see also
+    //       aiger_builder)
     variables _input_vars;
     variables _state_vars;
     variables _next_state_vars;

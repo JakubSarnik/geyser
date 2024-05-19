@@ -129,7 +129,16 @@ cnf_formula aiger_builder::build_init( const aiger& aig )
     auto init = cnf_formula{};
 
     for ( auto i = 0u; i < aig.num_latches; ++i )
-        init.add_clause( literal{ _state_vars[ i ], aig.latches[ i ].reset == 0 } );
+    {
+        const auto reset = aig.latches[ i ].reset;
+
+        // In Aiger 1.9, the reset can be either 0 (initialized as false),
+        // 1 (initialized as true) or equal to the latch literal, which means
+        // that the latch has a nondeterministic initial value.
+
+        if ( aiger_is_constant( reset ) )
+            init.add_clause( literal{ _state_vars[ i ], reset == 0 } );
+    }
 
     return init;
 }

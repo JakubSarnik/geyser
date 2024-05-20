@@ -1,46 +1,46 @@
 #pragma once
 
 #include "formula.hpp"
-#include <vector>
 #include <cassert>
+#include <utility>
 
 namespace geyser
 {
 
 class transition_system
 {
-    using variables = std::vector< variable >;
+    // The transition system consists of 3 formulas. The initial formula _init
+    // describes the initial states, the error formula _error describes the bad
+    // states and the transition formula _trans describes the transition
+    // relation. The formulas _init and _trans range over state variables, i.e.
+    // variables with IDs in the range [_state_vars_begin, _state_vars_end),
+    // and _trans ranges over those as well, plus the primed state variables in
+    // [_next_state_vars_begin, _next_state_vars_end) and the input variables
+    // in [_input_vars_begin, _input_vars_end). In addition, all three formulas
+    // might contain additional auxiliary Tseitin variables.
 
-    // The variables have to be stored in successive sequential order (i.e., if
-    // _state_vars begins with variable 3 and stores 4 variables, it contains
-    // 3, 4, 5, 6). This is necessary for quick substitutions.
-    // TODO: Unless we store more than just the ID in the variable handle, we
-    //       should change the vectors to simple integer ranges! (see also
-    //       aiger_builder)
-    variables _input_vars;
-    variables _state_vars;
-    variables _next_state_vars;
+    int _input_vars_begin, _input_vars_end;
+    int _state_vars_begin, _state_vars_end;
+    int _next_state_vars_begin, _next_state_vars_end;
 
-    cnf_formula _init; // Contains _state_vars
-    cnf_formula _trans; // Contains _input_vars, _state_vars and _next_state_vars
-    cnf_formula _error; // Contains _state_vars
-
-    // Note that the formulas also contain additional variables used for Tseitin
-    // encoding purposes.
+    cnf_formula _init;
+    cnf_formula _trans;
+    cnf_formula _error;
 
 public:
-    transition_system( variables input_vars, variables state_vars, variables next_state_vars,
+    using var_id_range = std::pair< int, int >;
+
+    transition_system( var_id_range input_vars, var_id_range state_vars, var_id_range next_state_vars,
                        cnf_formula init, cnf_formula trans, cnf_formula error )
-            : _input_vars{ std::move( input_vars ) }, _state_vars{ std::move( state_vars ) },
-              _next_state_vars{ std::move( next_state_vars ) },
+            : _input_vars_begin{ input_vars.first }, _input_vars_end{ input_vars.second },
+              _state_vars_begin{ state_vars.first }, _state_vars_end{ state_vars.second },
+              _next_state_vars_begin{ next_state_vars.first }, _next_state_vars_end{ next_state_vars.second },
               _init{ std::move( init ) }, _trans{ std::move( trans ) }, _error{ std::move( error ) }
     {
-        // This is obviously not a complete proof that the var vectors are
-        // correct (see the comment above), but it's a nice cheap sanity check.
-        assert( _input_vars.back().id() - _input_vars.front().id() + 1 == _input_vars.size());
-        assert( _state_vars.back().id() - _state_vars.front().id() + 1 == _state_vars.size());
-        assert( _next_state_vars.back().id() - _next_state_vars.front().id() + 1 == _next_state_vars.size());
-        assert( _state_vars.size() == _next_state_vars.size() );
+        assert( _input_vars_begin <= _input_vars_end );
+        assert( _state_vars_begin <= _state_vars_end );
+        assert( _next_state_vars_begin <= _next_state_vars_end );
+        assert( _next_state_vars_end - _next_state_vars_begin == _state_vars_end - _state_vars_begin );
     }
 };
 

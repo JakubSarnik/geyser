@@ -9,23 +9,77 @@
 namespace geyser
 {
 
+namespace
+{
+using aiger_literal = unsigned int;
+}
+
 class aiger_builder
 {
-    using variables = std::vector< variable >;
-
     variable_store* _store;
+    aiger* _aig;
 
-    variables _input_vars;
-    variables _state_vars;
-    variables _next_state_vars;
-    variables _aux_vars; // Tseitin encoding auxiliaries
+    int _input_vars_begin = 0, _input_vars_end = 0;
+    int _state_vars_begin = 0, _state_vars_end = 0;
+    int _next_state_vars_begin = 0, _next_state_vars_end = 0;
+    int _and_vars_begin = 0;
+    [[maybe_unused]] int _and_vars_end = 0;
 
-    cnf_formula build_init( const aiger& aig );
-    cnf_formula build_trans( const aiger& aig );
-    cnf_formula build_error( const aiger& aig );
+    [[nodiscard]] variable get_input_var( int index ) const
+    {
+        const auto pos = _input_vars_begin + index;
+        assert( pos < _input_vars_end );
+
+        return variable{ pos };
+    }
+
+    [[nodiscard]] variable get_state_var( int index ) const
+    {
+        const auto pos = _state_vars_begin + index;
+        assert( pos < _state_vars_end );
+
+        return variable{ pos };
+    }
+
+    [[nodiscard]] variable get_next_state_var( int index ) const
+    {
+        const auto pos = _next_state_vars_begin + index;
+        assert( pos < _next_state_vars_end );
+
+        return variable{ pos };
+    }
+
+    [[nodiscard]] variable get_and_var( int index ) const
+    {
+        const auto pos = _and_vars_begin + index;
+        assert( pos < _and_vars_end );
+
+        return variable{ pos };
+    }
+
+    // TODO: Do we need the primed parameter?
+    [[nodiscard]]
+    variable aiger_var_to_our_var( aiger_literal lit, bool primed = false ) const;
+
+    [[nodiscard]]
+    literal aiger_lit_to_our_lit( aiger_literal lit, bool primed = false ) const
+    {
+        return literal
+        {
+            aiger_var_to_our_var( aiger_strip( lit ), primed ),
+            aiger_sign( lit ) == 1
+        };
+    }
+
+    [[nodiscard]]
+    cnf_formula clausify_and( aiger_literal lhs, aiger_literal rhs0, aiger_literal rhs1 );
+
+    cnf_formula build_init();
+    cnf_formula build_trans();
+    cnf_formula build_error();
 
 public:
-    explicit aiger_builder( variable_store& store ) : _store{ &store } {}
+    explicit aiger_builder( variable_store& store, aiger& aig ) : _store{ &store }, _aig{ &aig } {}
 
     aiger_builder( const aiger_builder& ) = delete;
     aiger_builder& operator=( const aiger_builder& ) = delete;
@@ -36,7 +90,7 @@ public:
     ~aiger_builder() = default;
 
     // This consumes this builder, as it moves its data into the transition system!
-    [[nodiscard]] std::expected< transition_system, std::string > build( const aiger& aig );
+    [[nodiscard]] std::expected< transition_system, std::string > build();
 };
 
 } // namespace geyser

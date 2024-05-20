@@ -11,17 +11,14 @@ namespace geyser
 
 class variable
 {
-    friend class variable_store;
-    friend class literal;
-
     int _id;
 
+public:
     explicit variable( int id ) : _id{ id } // NOLINT
     {
         assert( id > 0 );
     }
 
-public:
     [[nodiscard]] int id() const { return _id; }
 
     friend auto operator<=>( variable, variable ) = default;
@@ -65,7 +62,6 @@ public:
     // A dummy value for 0
     variable_store() : _names{ "" } {}
 
-    [[nodiscard]]
     variable make( std::string name = "" )
     {
         _names.emplace_back( std::move( name ) );
@@ -73,11 +69,16 @@ public:
     }
 
     [[nodiscard]]
-    const std::string& get_name( variable var )
+    const std::string& get_name( variable var ) const
     {
         assert( var.id() < _names.size() );
 
         return _names[ var.id() ];
+    }
+
+    [[nodiscard]] int get_variable_count() const
+    {
+        return static_cast< int >( _names.size() );
     }
 };
 

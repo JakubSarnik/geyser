@@ -57,6 +57,8 @@ public:
     friend auto operator<=>( literal, literal ) = default;
 };
 
+inline literal literal::separator{ 0 };
+
 class variable_store
 {
     // Maps a variable identifier (a positive integer) to its name.

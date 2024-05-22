@@ -33,7 +33,6 @@ add_dependencies(cadical cadical_build)
 
 # TODO: Reorder this once a structure is clearly established.
 add_library(geyser STATIC
-        src/formula.cpp
         src/transition_system.cpp
         src/options.cpp
         src/engine/base.cpp

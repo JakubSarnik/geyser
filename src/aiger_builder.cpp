@@ -33,31 +33,31 @@ std::expected< transition_system, std::string > aiger_builder::build()
         return std::unexpected( "NOT IMPLEMENTED: aiger 1.9 invariant constraints are not"
                                 " implemented yet" );
 
-    _input_vars_begin = _store->get_variable_count();
+    _input_vars_begin = _store->next_id();
 
     for ( auto i = 0u; i < _aig->num_inputs; ++i )
         _store->make( symbol_to_string( "y", i, _aig->inputs[ i ] ) );
 
-    _input_vars_end = _store->get_variable_count();
+    _input_vars_end = _store->next_id();
     _state_vars_begin = _input_vars_end;
 
     // The following two loops CANNOT be merged because of sequentiality constraints!
     for ( auto i = 0u; i < _aig->num_latches; ++i )
         _store->make( symbol_to_string( "x", i, _aig->latches[ i ] ) );
 
-    _state_vars_end = _store->get_variable_count();
+    _state_vars_end = _store->next_id();
     _next_state_vars_begin = _state_vars_end;
 
     for ( auto i = 0u; i < _aig->num_latches; ++i )
         _store->make( symbol_to_string( "x'", i, _aig->latches[ i ] ) );
 
-    _next_state_vars_end = _store->get_variable_count();
+    _next_state_vars_end = _store->next_id();
     _and_vars_begin = _next_state_vars_end;
 
     for ( auto i = 0u; i < _aig->num_ands; ++i )
         _store->make( std::string{"and["} + std::to_string( i ) + "]" );
 
-    _and_vars_end = _store->get_variable_count();
+    _and_vars_end = _store->next_id();
 
     auto init = build_init();
     auto trans = build_trans();

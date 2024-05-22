@@ -65,7 +65,7 @@ public:
     variable make( std::string name = "" )
     {
         _names.emplace_back( std::move( name ) );
-        return variable{ static_cast< int >( _names.size() ) };
+        return variable{ static_cast< int >( _names.size() - 1 ) };
     }
 
     [[nodiscard]]
@@ -76,7 +76,7 @@ public:
         return _names[ var.id() ];
     }
 
-    [[nodiscard]] int get_variable_count() const
+    [[nodiscard]] int next_id() const
     {
         return static_cast< int >( _names.size() );
     }

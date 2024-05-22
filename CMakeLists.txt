@@ -32,7 +32,7 @@ set_target_properties(cadical PROPERTIES IMPORTED_LOCATION "${CADICAL_BINARY_DIR
 add_dependencies(cadical cadical_build)
 
 # TODO: Reorder this once a structure is clearly established.
-add_executable(geyser src/main.cpp
+add_library(geyser STATIC
         src/formula.cpp
         src/transition_system.cpp
         src/options.cpp
@@ -46,3 +46,9 @@ target_link_libraries(geyser PUBLIC cadical)
 target_include_directories(geyser PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(geyser PUBLIC "${AIGER_HEADER_DIR}")
 target_include_directories(geyser PUBLIC "${CADICAL_HEADER_DIR}")
+
+add_executable(run-geyser src/main.cpp)
+
+target_link_libraries(run-geyser PUBLIC geyser)
+
+add_subdirectory(test)

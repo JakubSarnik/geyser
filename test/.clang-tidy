@@ -1,0 +1,3 @@
+# This disables linter warnings that are produced by Catch2 macro expansions
+InheritParentConfig: true
+Checks: -misc-use-anonymous-namespace

@@ -8,5 +8,5 @@ model checking algorithms, including PDR, CAR and its variants.
 
 The repository contains a copy of CaDiCaL SAT solver by Armin Biere et al. (in
 `dep/cadical`) and a part of his Aiger library for manipulating and-inverter
-graphs (`dep/aiger`). See the respective directories for licenses of those
-parts.
+graphs (`dep/aiger`). Additionally, Catch2 is included for testing (`dep/catch2`).
+See the respective directories for licenses of those parts.

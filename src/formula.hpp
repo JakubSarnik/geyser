@@ -1,13 +1,17 @@
 #pragma once
 
+#include <utility>
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <concepts>
 #include <cassert>
 #include <cmath>
 
 namespace geyser
 {
+
+using var_id_range = std::pair< int, int >;
 
 class variable
 {
@@ -58,6 +62,11 @@ class variable_store
     // Maps a variable identifier (a positive integer) to its name.
     std::vector< std::string > _names;
 
+    [[nodiscard]] int get_next_id() const
+    {
+        return static_cast< int >( _names.size() );
+    }
+
 public:
     // A dummy value for 0
     variable_store() : _names{ "" } {}
@@ -68,17 +77,40 @@ public:
         return variable{ static_cast< int >( _names.size() - 1 ) };
     }
 
+    // Namer is a callback that receives the current index (0 based, not id) of
+    // the variable and returns its name. Returns a left-inclusive, right-exclusive
+    // pair of delimiting IDs.
+    [[nodiscard]]
+    std::pair< int, int > make_range( int n, const std::regular_invocable< int > auto& namer )
+    {
+        const auto fst = get_next_id();
+
+        for ( auto i = 0; i < n; ++i )
+            make( namer( i ) );
+
+        const auto snd = get_next_id();
+
+        return { fst, snd };
+    }
+
+    [[nodiscard]]
+    std::pair< int, int > make_range( int n )
+    {
+        const auto namer = []( int )
+        {
+            return "";
+        };
+
+        return make_range( n, namer );
+    }
+
     [[nodiscard]]
     const std::string& get_name( variable var ) const
     {
+        assert( var.id() >= 0 );
         assert( var.id() < _names.size() );
 
         return _names[ var.id() ];
-    }
-
-    [[nodiscard]] int next_id() const
-    {
-        return static_cast< int >( _names.size() );
     }
 };
 

@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <formula.hpp>
 #include <vector>
+#include <format>
 
 using namespace geyser;
 
@@ -40,22 +41,6 @@ TEST_CASE( "Variable store hands out different variables" )
     REQUIRE( x != y );
 }
 
-TEST_CASE( "Variable store counts handed out variables correctly" )
-{
-    auto store = variable_store{};
-
-    REQUIRE( store.next_id() == 1 );
-
-    store.make();
-
-    REQUIRE( store.next_id() == 2 );
-
-    store.make();
-    store.make();
-
-    REQUIRE( store.next_id() == 4 );
-}
-
 TEST_CASE( "Variables have the expected names" )
 {
     auto store = variable_store{};
@@ -66,6 +51,61 @@ TEST_CASE( "Variables have the expected names" )
     REQUIRE( store.get_name( x ) == "foo" );
     REQUIRE( store.get_name( y ) == "bar" );
     REQUIRE( store.get_name( variable{ 1 } ) == "foo" );
+}
+
+TEST_CASE( "Variable store hands out ranges correctly" )
+{
+    auto store = variable_store{};
+
+    const auto [ a, b ] = store.make_range( 3 );
+
+    REQUIRE( a == 1 );
+    REQUIRE( b == 4 );
+
+    const auto [ c, d ] = store.make_range( 5 );
+
+    REQUIRE( c == 4 );
+    REQUIRE( d == 9 );
+}
+
+TEST_CASE( "Ranges are named correctly" )
+{
+    auto store = variable_store{};
+
+    SECTION( "when no name is present" )
+    {
+        const auto [ a, b ] = store.make_range( 4 );
+
+        for ( auto i = a; i < b; ++i )
+            REQUIRE( store.get_name( variable{ i } ) == "" );
+    }
+
+    SECTION( "when a constant name is present" )
+    {
+        const auto namer = []( int )
+        {
+            return "name";
+        };
+
+        const auto [ a, b ] = store.make_range( 4, namer );
+
+        for ( auto i = a; i < b; ++i )
+            REQUIRE( store.get_name( variable{ i } ) == "name" );
+    }
+
+    SECTION( "when a dynamic name is present" )
+    {
+        const auto namer = []( int i )
+        {
+            return std::format("x{}", i);
+        };
+
+        const auto [ a, b ] = store.make_range( 3, namer );
+
+        REQUIRE( store.get_name( variable{ a } ) == "x0" );
+        REQUIRE( store.get_name( variable{ a + 1 } ) == "x1" );
+        REQUIRE( store.get_name( variable{ a + 2 } ) == "x2" );
+    }
 }
 
 TEST_CASE( "Literals have the expected IDs and values" )

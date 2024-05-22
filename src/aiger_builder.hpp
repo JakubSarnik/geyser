@@ -3,94 +3,67 @@
 #include "formula.hpp"
 #include "transition_system.hpp"
 #include "caiger.hpp"
+#include <utility>
 #include <string>
 #include <expected>
 
-namespace geyser
+namespace geyser::builder
 {
 
-namespace
-{
 using aiger_literal = unsigned int;
-}
 
-class aiger_builder
+struct context
 {
-    variable_store* _store;
-    aiger* _aig;
+    aiger* aig;
 
-    int _input_vars_begin = 0, _input_vars_end = 0;
-    int _state_vars_begin = 0, _state_vars_end = 0;
-    int _next_state_vars_begin = 0, _next_state_vars_end = 0;
-    int _and_vars_begin = 0;
-    [[maybe_unused]] int _and_vars_end = 0;
-
-    [[nodiscard]] variable get_input_var( int index ) const
-    {
-        const auto pos = _input_vars_begin + index;
-        assert( pos < _input_vars_end );
-
-        return variable{ pos };
-    }
-
-    [[nodiscard]] variable get_state_var( int index ) const
-    {
-        const auto pos = _state_vars_begin + index;
-        assert( pos < _state_vars_end );
-
-        return variable{ pos };
-    }
-
-    [[nodiscard]] variable get_next_state_var( int index ) const
-    {
-        const auto pos = _next_state_vars_begin + index;
-        assert( pos < _next_state_vars_end );
-
-        return variable{ pos };
-    }
-
-    [[nodiscard]] variable get_and_var( int index ) const
-    {
-        const auto pos = _and_vars_begin + index;
-        assert( pos < _and_vars_end );
-
-        return variable{ pos };
-    }
-
-    // TODO: Do we need the primed parameter?
-    [[nodiscard]]
-    variable aiger_var_to_our_var( aiger_literal lit, bool primed = false ) const;
-
-    [[nodiscard]]
-    literal aiger_lit_to_our_lit( aiger_literal lit, bool primed = false ) const
-    {
-        return literal
-        {
-            aiger_var_to_our_var( aiger_strip( lit ), primed ),
-            aiger_sign( lit ) == 1
-        };
-    }
-
-    [[nodiscard]]
-    cnf_formula clausify_and( aiger_literal lhs, aiger_literal rhs0, aiger_literal rhs1 );
-
-    cnf_formula build_init();
-    cnf_formula build_trans();
-    cnf_formula build_error();
-
-public:
-    explicit aiger_builder( variable_store& store, aiger& aig ) : _store{ &store }, _aig{ &aig } {}
-
-    aiger_builder( const aiger_builder& ) = delete;
-    aiger_builder& operator=( const aiger_builder& ) = delete;
-
-    aiger_builder( aiger_builder&& ) = delete;
-    aiger_builder& operator=( aiger_builder&& ) = delete;
-
-    ~aiger_builder() = default;
-
-    // This consumes this builder, as it moves its data into the transition system!
-    [[nodiscard]] std::expected< transition_system, std::string > build();
+    var_id_range input_vars;
+    var_id_range state_vars;
+    var_id_range next_state_vars;
+    var_id_range and_vars;
 };
 
-} // namespace geyser
+inline variable get_var( var_id_range range, int index )
+{
+    const auto pos = range.first + index;
+
+    assert( pos >= range.first );
+    assert( pos < range.second );
+
+    return variable{ pos };
+}
+
+inline variable from_aiger_var( context& ctx, aiger_literal lit )
+{
+    // The aiger lib expects this to be a positive literal (i.e. a variable).
+    assert( lit % 2 == 0 );
+    assert( lit >= 2 ); // Not constants true/false
+
+    if ( const auto *ptr = aiger_is_input( ctx.aig, lit ); ptr )
+        return get_var( ctx.input_vars, int( ptr - ctx.aig->inputs ) );
+    if ( const auto *ptr = aiger_is_latch( ctx.aig, lit ); ptr )
+        return get_var( ctx.state_vars, int( ptr - ctx.aig->latches ) );
+    if ( const auto *ptr = aiger_is_and( ctx.aig, lit ); ptr )
+        return get_var( ctx.and_vars, int( ptr - ctx.aig->ands ) );
+
+    assert( false ); // Unreachable
+}
+
+inline literal from_aiger_lit( context& ctx, aiger_literal lit )
+{
+    return literal
+    {
+        from_aiger_var( ctx, aiger_strip( lit ) ), // NOLINT
+        aiger_sign( lit ) == 1 // NOLINT
+    };
+}
+
+cnf_formula clausify_and( context& ctx, aiger_and conj );
+
+[[nodiscard]]
+std::expected< transition_system, std::string > build_from_aiger( variable_store& store, aiger& aig );
+
+cnf_formula build_init( context& ctx );
+cnf_formula build_trans( context& ctx );
+cnf_formula build_error( context& ctx );
+
+} // namespace geyser::builder

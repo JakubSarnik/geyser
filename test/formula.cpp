@@ -56,6 +56,18 @@ TEST_CASE( "Variable store counts handed out variables correctly" )
     REQUIRE( store.next_id() == 4 );
 }
 
+TEST_CASE( "Variables have the expected names" )
+{
+    auto store = variable_store{};
+
+    auto x = store.make( "foo" );
+    auto y = store.make( "bar" );
+
+    REQUIRE( store.get_name( x ) == "foo" );
+    REQUIRE( store.get_name( y ) == "bar" );
+    REQUIRE( store.get_name( variable{ 1 } ) == "foo" );
+}
+
 TEST_CASE( "Literals have the expected IDs and values" )
 {
     auto store = variable_store{};

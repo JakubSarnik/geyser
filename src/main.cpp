@@ -5,8 +5,7 @@
 
 int main( int argc, char** argv ) {
     auto opts = geyser::parse_cli( argc, argv );
-
-    auto aig = std::unique_ptr< aiger, decltype( &aiger_reset ) >( aiger_init(), &aiger_reset );
+    auto aig = geyser::make_aiger();
 
     const char* msg = nullptr;
 

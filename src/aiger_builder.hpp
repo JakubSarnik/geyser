@@ -1,6 +1,6 @@
 #pragma once
 
-#include "formula.hpp"
+#include "logic.hpp"
 #include "transition_system.hpp"
 #include "caiger.hpp"
 #include <utility>

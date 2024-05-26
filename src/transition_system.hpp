@@ -1,6 +1,6 @@
 #pragma once
 
-#include "formula.hpp"
+#include "logic.hpp"
 #include <cassert>
 #include <utility>
 

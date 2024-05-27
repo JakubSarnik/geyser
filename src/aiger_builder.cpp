@@ -36,30 +36,7 @@ std::expected< transition_system, std::string > build_from_aiger( variable_store
         return std::unexpected( "NOT IMPLEMENTED: aiger 1.9 invariant constraints are not"
                                 " implemented yet" );
 
-    auto ctx = context
-    {
-        .aig = &aig,
-
-        .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
-        {
-            return symbol_to_string( "y", i, aig.inputs[ i ] );
-        }),
-
-        .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-        {
-            return symbol_to_string( "x", i, aig.latches[ i ] );
-        }),
-
-        .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-        {
-            return symbol_to_string( "x'", i, aig.latches[ i ] );
-        }),
-
-        .and_vars = store.make_range( int( aig.num_ands ), []( int i )
-        {
-            return std::format("and[{}]", i);
-        } )
-    };
+    auto ctx = make_context( store, aig );
 
     auto init = build_init( ctx );
     auto trans = build_trans( ctx );
@@ -67,6 +44,34 @@ std::expected< transition_system, std::string > build_from_aiger( variable_store
 
     return transition_system{ ctx.input_vars, ctx.state_vars, ctx.next_state_vars,
                               std::move( init ), std::move( trans ), std::move( error ) };
+}
+
+context make_context( variable_store& store, aiger& aig )
+{
+    return context
+    {
+            .aig = &aig,
+
+            .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
+            {
+                return symbol_to_string( "y", i, aig.inputs[ i ] );
+            }),
+
+            .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
+            {
+                return symbol_to_string( "x", i, aig.latches[ i ] );
+            }),
+
+            .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
+            {
+                return symbol_to_string( "x'", i, aig.latches[ i ] );
+            }),
+
+            .and_vars = store.make_range( int( aig.num_ands ), []( int i )
+            {
+                return std::format("and[{}]", i);
+            } )
+    };
 }
 
 // The Aiger to CNF conversion is heavily inspired by the code in IC3Ref
@@ -175,10 +180,9 @@ cnf_formula build_error( context& ctx )
     // or negative (odd).
 
     auto error = cnf_formula{};
+    const auto error_literal = ( ctx.aig->num_outputs > 0 ? ctx.aig->outputs[ 0 ] : ctx.aig->bad[ 0 ] ).lit;
 
-    auto required = std::unordered_set< aiger_literal >{
-            ( ctx.aig->num_outputs > 0 ? ctx.aig->outputs[ 0 ] : ctx.aig->bad[ 0 ] ).lit
-    };
+    auto required = std::unordered_set< aiger_literal >{ error_literal };
 
     for ( auto i = int( ctx.aig->num_ands ) - 1; i >= 0; --i )
     {
@@ -193,6 +197,17 @@ cnf_formula build_error( context& ctx )
         required.insert( rhs0 );
         required.insert( rhs1 );
     }
+
+    // If by now the formula is still empty, then the error literal must not be
+    // a result of an and line and as such must be either directly an input or
+    // a state variable.
+    if ( error.literals().empty() )
+        error.add_cnf( clausify_and( ctx, aiger_and
+        {
+            .lhs = error_literal,
+            .rhs0 = aiger_true,
+            .rhs1 = aiger_true
+        } ) );
 
     return error;
 }

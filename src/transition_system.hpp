@@ -37,6 +37,10 @@ public:
         assert( _next_state_vars.first <= _next_state_vars.second );
         assert( _next_state_vars.second - _next_state_vars.first == _state_vars.second - _state_vars.first );
     }
+
+    [[nodiscard]] const cnf_formula& init() const { return _init; }
+    [[nodiscard]] const cnf_formula& trans() const { return _trans; }
+    [[nodiscard]] const cnf_formula& error() const { return _error; }
 };
 
 } // namespace geyser

@@ -174,7 +174,7 @@ cnf_formula build_error( context& ctx )
     //
     // NOTE: Aiger literals are the numbers in the aiger file
     // ([0 .. 2 * (aig.maxvar) + 1]; 0 = false, 1 = true), which does NOT
-    // correspond to our variable ordering in any way.
+    // correspond to our variable ordering.
     //
     // Notably, aiger literal's parity denotes whether it's positive (even)
     // or negative (odd).
@@ -198,16 +198,8 @@ cnf_formula build_error( context& ctx )
         required.insert( rhs1 );
     }
 
-    // If by now the formula is still empty, then the error literal must not be
-    // a result of an and line and as such must be either directly an input or
-    // a state variable.
-    if ( error.literals().empty() )
-        error.add_cnf( clausify_and( ctx, aiger_and
-        {
-            .lhs = error_literal,
-            .rhs0 = aiger_true,
-            .rhs1 = aiger_true
-        } ) );
+    // An error means that the error literal is true.
+    error.add_clause( from_aiger_lit( ctx, error_literal ) );
 
     return error;
 }

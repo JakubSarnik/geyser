@@ -57,8 +57,6 @@ inline literal from_aiger_lit( context& ctx, aiger_literal lit )
     };
 }
 
-cnf_formula clausify_and( context& ctx, aiger_and conj );
-
 [[nodiscard]]
 std::expected< transition_system, std::string > build_from_aiger( variable_store& store, aiger& aig );
 

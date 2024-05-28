@@ -8,7 +8,7 @@ using namespace geyser;
 namespace
 {
 
-std::vector< int > formula_to_nums( const cnf_formula& formula )
+std::vector< int > to_nums( const cnf_formula& formula )
 {
     auto res = std::vector< int >{};
 
@@ -174,21 +174,21 @@ TEST_CASE( "CNF formula is built correctly using add_clause" )
     formula.add_clause( { a, b } );
 
     REQUIRE( formula.literals() == std::vector{ a, b, literal::separator } );
-    REQUIRE( formula_to_nums( formula ) == std::vector{ 1, 2, 0 } );
+    REQUIRE( to_nums( formula ) == std::vector{ 1, 2, 0 } );
 
     formula.add_clause( !a );
 
-    REQUIRE( formula_to_nums( formula ) == std::vector{ 1, 2, 0, -1, 0 } );
+    REQUIRE( to_nums( formula ) == std::vector{ 1, 2, 0, -1, 0 } );
 
     auto c = literal{ store.make() };
 
     formula.add_clause( c, !c );
 
-    REQUIRE( formula_to_nums( formula ) == std::vector{ 1, 2, 0, -1, 0, 3, -3, 0 } );
+    REQUIRE( to_nums( formula ) == std::vector{ 1, 2, 0, -1, 0, 3, -3, 0 } );
 
     formula.add_clause( {} );
 
-    REQUIRE( formula_to_nums( formula ) == std::vector{ 1, 2, 0, -1, 0, 3, -3, 0, 0 } );
+    REQUIRE( to_nums( formula ) == std::vector{ 1, 2, 0, -1, 0, 3, -3, 0, 0 } );
 }
 
 TEST_CASE( "CNF formula is built correctly using add_cnf" )
@@ -203,7 +203,7 @@ TEST_CASE( "CNF formula is built correctly using add_cnf" )
     f1.add_clause(a, b, b);
     f1.add_clause(!b);
 
-    REQUIRE( formula_to_nums( f1 ) == std::vector{ 1, 2, 2, 0, -2, 0 } );
+    REQUIRE( to_nums( f1 ) == std::vector{ 1, 2, 2, 0, -2, 0 } );
 
     auto f2 = cnf_formula{};
 
@@ -212,9 +212,9 @@ TEST_CASE( "CNF formula is built correctly using add_cnf" )
     f2.add_clause(a);
     f2.add_clause(b, !c);
 
-    REQUIRE( formula_to_nums( f2 ) == std::vector{ 1, 0, 2, -3, 0 } );
+    REQUIRE( to_nums( f2 ) == std::vector{ 1, 0, 2, -3, 0 } );
 
     f1.add_cnf( f2 );
 
-    REQUIRE( formula_to_nums( f1 ) == std::vector{ 1, 2, 2, 0, -2, 0, 1, 0, 2, -3, 0 } );
+    REQUIRE( to_nums( f1 ) == std::vector{ 1, 2, 2, 0, -2, 0, 1, 0, 2, -3, 0 } );
 }

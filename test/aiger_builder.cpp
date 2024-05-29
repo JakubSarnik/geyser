@@ -39,8 +39,6 @@ std::vector< literal > to_literals( const std::vector< int >& nums )
     return res;
 }
 
-
-
 } // namespace <anonymous>
 
 // ASCII Aiger files pre 1.9 have the following header:
@@ -239,4 +237,132 @@ TEST_CASE( "Or gate" )
         // Our formula: (-z \/ -x) /\ (-z \/ -y) /\ (x \/ y \/ z)
         REQUIRE( res->error().literals() == to_literals( { -3, -1, 0, -3, -2, 0, 1, 2, 3, 0, -3, 0 } ) );
     }
+}
+
+TEST_CASE( "Constant latch initialized with false" )
+{
+    const auto* const str =
+            "aag 1 0 1 1 0\n"
+            "2 2\n"
+            "2\n";
+
+    auto aig = read_aiger( str );
+    auto store = variable_store{};
+
+    SECTION( "Context is set up correctly" )
+    {
+        auto ctx = make_context( store, *aig );
+
+        REQUIRE( ctx.aig == aig.get() );
+
+        REQUIRE( amount_of( ctx.input_vars ) == 0 );
+        REQUIRE( amount_of( ctx.state_vars ) == 1 );
+        REQUIRE( amount_of( ctx.next_state_vars ) == 1 );
+        REQUIRE( amount_of( ctx.and_vars ) == 0 );
+
+        const auto x = literal{ variable{ get_var( ctx.state_vars, 0 ) } };
+
+        REQUIRE( from_aiger_lit( ctx, 2 ) == x );
+        REQUIRE( from_aiger_lit( ctx, 3 ) == !x );
+    }
+
+    SECTION( "The transition system is correct" )
+    {
+        auto res = build_from_aiger( store, *aig );
+
+        REQUIRE( res.has_value() );
+        // -x
+        REQUIRE( res->init().literals() == to_literals( { -1, 0 } ) );
+        // x' = x (i.e. (-x' \/ x) /\ (-x \/ x'))
+        REQUIRE( res->trans().literals() == to_literals( { -2, 1, 0, -1, 2, 0 } ) );
+        // x
+        REQUIRE( res->error().literals() == to_literals( { 1, 0 } ) );
+    }
+}
+
+TEST_CASE( "Constant latch initialized with true" )
+{
+    const auto* const str =
+            "aag 1 0 1 1 0\n"
+            "2 2 1\n"
+            "2\n";
+
+    auto aig = read_aiger( str );
+    auto store = variable_store{};
+
+    SECTION( "Context is set up correctly" )
+    {
+        auto ctx = make_context( store, *aig );
+
+        REQUIRE( ctx.aig == aig.get() );
+
+        REQUIRE( amount_of( ctx.input_vars ) == 0 );
+        REQUIRE( amount_of( ctx.state_vars ) == 1 );
+        REQUIRE( amount_of( ctx.next_state_vars ) == 1 );
+        REQUIRE( amount_of( ctx.and_vars ) == 0 );
+
+        const auto x = literal{ variable{ get_var( ctx.state_vars, 0 ) } };
+
+        REQUIRE( from_aiger_lit( ctx, 2 ) == x );
+        REQUIRE( from_aiger_lit( ctx, 3 ) == !x );
+    }
+
+    SECTION( "The transition system is correct" )
+    {
+        auto res = build_from_aiger( store, *aig );
+
+        REQUIRE( res.has_value() );
+        // x
+        REQUIRE( res->init().literals() == to_literals( { 1, 0 } ) );
+        // x' = x (i.e. (-x' \/ x) /\ (-x \/ x'))
+        REQUIRE( res->trans().literals() == to_literals( { -2, 1, 0, -1, 2, 0 } ) );
+        // x
+        REQUIRE( res->error().literals() == to_literals( { 1, 0 } ) );
+    }
+}
+
+TEST_CASE( "Simple flip flop" )
+{
+    const auto* const str =
+            "aag 1 0 1 1 0\n"
+            "2 3\n"
+            "2\n";
+
+    auto aig = read_aiger( str );
+    auto store = variable_store{};
+
+    SECTION( "Context is set up correctly" )
+    {
+        auto ctx = make_context( store, *aig );
+
+        REQUIRE( ctx.aig == aig.get() );
+
+        REQUIRE( amount_of( ctx.input_vars ) == 0 );
+        REQUIRE( amount_of( ctx.state_vars ) == 1 );
+        REQUIRE( amount_of( ctx.next_state_vars ) == 1 );
+        REQUIRE( amount_of( ctx.and_vars ) == 0 );
+
+        const auto x = literal{ variable{ get_var( ctx.state_vars, 0 ) } };
+
+        REQUIRE( from_aiger_lit( ctx, 2 ) == x );
+        REQUIRE( from_aiger_lit( ctx, 3 ) == !x );
+    }
+
+    SECTION( "The transition system is correct" )
+    {
+        auto res = build_from_aiger( store, *aig );
+
+        REQUIRE( res.has_value() );
+        // -x
+        REQUIRE( res->init().literals() == to_literals( { -1, 0 } ) );
+        // x' = -x (i.e. (-x' \/ -x) /\ (x \/ x'))
+        REQUIRE( res->trans().literals() == to_literals( { -2, -1, 0, 1, 2, 0 } ) );
+        // x
+        REQUIRE( res->error().literals() == to_literals( { 1, 0 } ) );
+    }
+}
+
+TEST_CASE( "More complicated flip flop" )
+{
+    // TODO
 }

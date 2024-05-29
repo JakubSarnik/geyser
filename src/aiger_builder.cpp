@@ -44,12 +44,11 @@ cnf_formula clausify_and( context& ctx, aiger_and conj )
 
     const auto [ lhs, rhs0, rhs1 ] = conj;
 
-    // Anything AND false is a contradiction, i.e. a formula with an empty
-    // clause.
+    // lhs = false
     if ( rhs0 == aiger_false || rhs1 == aiger_false )
     {
         auto res = cnf_formula{};
-        res.add_clause( {} );
+        res.add_clause( !mk_lit( lhs ) );
 
         return res;
     }

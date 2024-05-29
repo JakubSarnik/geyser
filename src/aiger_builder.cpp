@@ -9,7 +9,7 @@ namespace geyser::builder
 namespace
 {
 
-inline std::string symbol_to_string( const std::string& prefix, unsigned i, aiger_symbol& symbol )
+std::string symbol_to_string( const std::string& prefix, unsigned i, aiger_symbol& symbol )
 {
     // Anonymous inputs/state vars get names like y[10]/x[2], respectively.
     if ( symbol.name == nullptr )

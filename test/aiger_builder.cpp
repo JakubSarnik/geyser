@@ -9,7 +9,7 @@ using namespace geyser::builder;
 namespace
 {
 
-inline aiger_ptr read_aiger( const char* str )
+aiger_ptr read_aiger( const char* str )
 {
     auto aig = make_aiger();
     const auto* const err = aiger_read_from_string( aig.get(), str );
@@ -19,7 +19,7 @@ inline aiger_ptr read_aiger( const char* str )
     return aig;
 }
 
-inline int amount_of( var_id_range range )
+int amount_of( var_id_range range )
 {
     return range.second - range.first;
 }

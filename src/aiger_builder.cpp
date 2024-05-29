@@ -82,6 +82,39 @@ cnf_formula clausify_and( context& ctx, aiger_and conj )
     return res;
 }
 
+// Do a reverse traversal from the Aiger literal representing the result
+// through all the ANDs and ending with leaves consisting of state variables
+// and inputs.
+//
+// NOTE: Aiger literals are the numbers in the aiger file
+// ([0 .. 2 * (aig.maxvar) + 1]; 0 = false, 1 = true), which does NOT
+// correspond to our variable ordering.
+//
+// Notably, aiger literal's parity denotes whether it's positive (even)
+// or negative (odd).
+cnf_formula clausify_subgraph( context& ctx, aiger_literal root )
+{
+    auto result = cnf_formula{};
+
+    auto required = std::unordered_set< aiger_literal >{ root };
+
+    for ( auto i = int( ctx.aig->num_ands ) - 1; i >= 0; --i )
+    {
+        const auto conj = ctx.aig->ands[ i ];
+        const auto [ lhs, rhs0, rhs1 ] = conj;
+
+        if ( !required.contains( lhs ) && !required.contains( aiger_not( lhs ) ) ) // NOLINT
+            continue;
+
+        result.add_cnf( clausify_and( ctx, conj ) );
+
+        required.insert( rhs0 );
+        required.insert( rhs1 );
+    }
+
+    return result;
+}
+
 } // namespace <anonymous>
 
 std::expected< transition_system, std::string > build_from_aiger( variable_store& store, aiger& aig )
@@ -114,27 +147,27 @@ context make_context( variable_store& store, aiger& aig )
 {
     return context
     {
-            .aig = &aig,
+        .aig = &aig,
 
-            .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
-            {
-                return symbol_to_string( "y", i, aig.inputs[ i ] );
-            }),
+        .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
+        {
+            return symbol_to_string( "y", i, aig.inputs[ i ] );
+        }),
 
-            .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-            {
-                return symbol_to_string( "x", i, aig.latches[ i ] );
-            }),
+        .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
+        {
+            return symbol_to_string( "x", i, aig.latches[ i ] );
+        }),
 
-            .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-            {
-                return symbol_to_string( "x'", i, aig.latches[ i ] );
-            }),
+        .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
+        {
+            return symbol_to_string( "x'", i, aig.latches[ i ] );
+        }),
 
-            .and_vars = store.make_range( int( aig.num_ands ), []( int i )
-            {
-                return std::format("and[{}]", i);
-            } )
+        .and_vars = store.make_range( int( aig.num_ands ), []( int i )
+        {
+            return std::format("and[{}]", i);
+        } )
     };
 }
 
@@ -155,7 +188,7 @@ cnf_formula build_init( context& ctx )
         // that the latch has a nondeterministic initial value.
 
         if ( aiger_is_constant( reset ) )
-            init.add_clause( literal{ get_var( ctx.input_vars, int( i ) ), reset == 0 } );
+            init.add_clause( literal{ get_var( ctx.state_vars, int( i ) ), reset == 0 } );
     }
 
     return init;
@@ -163,40 +196,36 @@ cnf_formula build_init( context& ctx )
 
 cnf_formula build_trans( context& ctx )
 {
-    return {}; // TODO
+    // For each state variable x and its primed (next state) variant x', add
+    // a conjunct x' = phi, where phi is the formula represented by the AIG
+    // subgraph ending in the 'next' literal of the aiger literal for x.
+
+    auto trans = cnf_formula{};
+
+    for ( auto i = 0u; i < ctx.aig->num_latches; ++i )
+    {
+        const auto next = literal{ get_var( ctx.next_state_vars, int( i ) ) };
+        const auto result_aig_literal = ctx.aig->latches[ i ].next;
+
+        trans.add_cnf( clausify_subgraph( ctx, result_aig_literal ) );
+
+        // x' = phi
+        // (x' is stored in next, phi is computed in result_aig_literal)
+        // ~> (x' -> phi) /\ (phi -> x')
+        // ~> (-x' \/ phi) /\ (-phi \/ x')
+        trans.add_clause( !next, from_aiger_lit( ctx, result_aig_literal ) );
+        trans.add_clause( !from_aiger_lit( ctx, result_aig_literal ), next );
+    }
+
+    return trans;
 }
 
 cnf_formula build_error( context& ctx )
 {
-    // Do a reverse traversal from the Aiger literal representing the error
-    // (either the single output or the single bad property) through all the
-    // ANDs and ending with leaves consisting of state variables and inputs.
-    //
-    // NOTE: Aiger literals are the numbers in the aiger file
-    // ([0 .. 2 * (aig.maxvar) + 1]; 0 = false, 1 = true), which does NOT
-    // correspond to our variable ordering.
-    //
-    // Notably, aiger literal's parity denotes whether it's positive (even)
-    // or negative (odd).
-
     auto error = cnf_formula{};
     const auto error_literal = ( ctx.aig->num_outputs > 0 ? ctx.aig->outputs[ 0 ] : ctx.aig->bad[ 0 ] ).lit;
 
-    auto required = std::unordered_set< aiger_literal >{ error_literal };
-
-    for ( auto i = int( ctx.aig->num_ands ) - 1; i >= 0; --i )
-    {
-        const auto conj = ctx.aig->ands[ i ];
-        const auto [ lhs, rhs0, rhs1 ] = conj;
-
-        if ( !required.contains( lhs ) && !required.contains( aiger_not( lhs ) ) ) // NOLINT
-            continue;
-
-        error.add_cnf( clausify_and( ctx, conj ) );
-
-        required.insert( rhs0 );
-        required.insert( rhs1 );
-    }
+    error.add_cnf( clausify_subgraph( ctx, error_literal ) );
 
     // An error means that the error literal is true.
     error.add_clause( from_aiger_lit( ctx, error_literal ) );

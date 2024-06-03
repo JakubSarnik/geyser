@@ -473,3 +473,59 @@ TEST_CASE( "More complicated flip flop" )
         check_system( store, *aig, system );
     }
 }
+
+TEST_CASE( "More complicated flip flop with negated next state function" )
+{
+    const auto* const str =
+            "aag 7 2 1 1 4\n"
+            "2\n"
+            "4\n"
+            "6 15\n"
+            "6\n"
+            "8 6 2\n"
+            "10 7 3\n"
+            "12 11 9\n"
+            "14 12 4\n";
+
+    auto aig = read_aiger( str );
+    auto store = variable_store{};
+
+    const auto y  = std::vector{ 1, 2 };
+    const auto x  = std::vector{ 3 };
+    const auto xp = std::vector{ 4 };
+    const auto a  = std::vector{ 5, 6, 7, 8 };
+
+    // a3  =  a2  /\  y1
+    // a2  = -a1  /\ -a0
+    // a1  = -x0  /\ -y0
+    // a0  =  x0  /\  y0
+    // x'0 = -a3
+
+    // (a3  ->  a2) /\ ( a3 ->  y1) /\ ( a2 /\  y1 -> a3) /\
+    // (a2  -> -a1) /\ ( a2 -> -a0) /\ (-a1 /\ -a0 -> a2) /\
+    // (a1  -> -x0) /\ ( a1 -> -y0) /\ (-x0 /\ -y0 -> a1) /\
+    // (a0  ->  x0) /\ ( a0 ->  y0) /\ ( x0 /\  y0 -> a0) /\
+    // (x'0 -> -a3) /\ (-a3 -> x'0)
+
+    // (-a3  \/  a2) /\ (-a3 \/  y1) /\ (-a2 \/ -y1 \/ a3)
+    // (-a2  \/ -a1) /\ (-a2 \/ -a0) /\ ( a1 \/  a0 \/ a2)
+    // (-a1  \/ -x0) /\ (-a1 \/ -y0) /\ ( x0 \/  y0 \/ a1)
+    // (-a0  \/  x0) /\ (-a0 \/  y0) /\ (-x0 \/ -y0 \/ a0)
+    // (-x'0 \/ -a3) /\ ( a3 \/ x'0)
+
+    const auto system = expected_system
+    {
+            .init = { -x[ 0 ], 0 },
+            .trans =
+            {
+                     -a[ 3 ],  a[ 2 ], 0, -a[ 3 ],  y[ 1 ], 0, -a[ 2 ], -y[ 1 ], a[ 3 ], 0,
+                     -a[ 2 ], -a[ 1 ], 0, -a[ 2 ], -a[ 0 ], 0,  a[ 1 ],  a[ 0 ], a[ 2 ], 0,
+                     -a[ 1 ], -x[ 0 ], 0, -a[ 1 ], -y[ 0 ], 0,  x[ 0 ],  y[ 0 ], a[ 1 ], 0,
+                     -a[ 0 ],  x[ 0 ], 0, -a[ 0 ],  y[ 0 ], 0, -x[ 0 ], -y[ 0 ], a[ 0 ], 0,
+                    -xp[ 0 ], -a[ 3 ], 0,  a[ 3 ], xp[ 0 ], 0
+            },
+            .error = { x[ 0 ], 0 }
+    };
+
+    check_system( store, *aig, system );
+}

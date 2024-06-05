@@ -132,6 +132,12 @@ std::expected< transition_system, std::string > build_from_aiger( variable_store
         return std::unexpected( "NOT IMPLEMENTED: aiger 1.9 invariant constraints are not"
                                 " implemented yet" );
 
+    // clausify_subgraph depends on ordering of ANDs where each line refers
+    // only to literals from previous lines. This, among other things, is
+    // ensured by reencoding the AIG.
+    if ( aiger_is_reencoded( &aig ) == 0 )
+        aiger_reencode( &aig );
+
     auto ctx = make_context( store, aig );
 
     auto init = build_init( ctx );

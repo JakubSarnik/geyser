@@ -163,7 +163,7 @@ TEST_CASE( "And gate" )
             "2\n"
             "4\n"
             "6\n"
-            "6 2 4\n";
+            "6 4 2\n";
 
     auto aig = read_aiger( str );
     auto store = variable_store{};
@@ -195,15 +195,15 @@ TEST_CASE( "And gate" )
     {
         // Inputs: x (1), y (2)
         // Ands: z (3)
-        // Original formula: z = x /\ y [output z]
-        // As implications: (z -> x) /\ (z -> y) /\ (x /\ y -> z)
-        // Our formula: (-z \/ x) /\ (-z \/ y) /\ (-x \/ -y \/ z)
+        // Original formula: z = y /\ x [output z]
+        // As implications: (z -> y) /\ (z -> x) /\ (y /\ x -> z)
+        // Our formula: (-z \/ y) /\ (-z \/ x) /\ (-y \/ -x \/ z)
 
         const auto system = expected_system
         {
             .init = {},
             .trans = {},
-            .error = { -3, 1, 0, -3, 2, 0, -1, -2, 3, 0, 3, 0 }
+            .error = { -3, 2, 0, -3, 1, 0, -2, -1, 3, 0, 3, 0 }
         };
 
         check_system( store, *aig, system );
@@ -217,7 +217,7 @@ TEST_CASE( "Or gate" )
             "2\n"
             "4\n"
             "7\n"
-            "6 3 5\n";
+            "6 5 3\n";
 
     auto aig = read_aiger( str );
     auto store = variable_store{};
@@ -251,7 +251,7 @@ TEST_CASE( "Or gate" )
         {
             .init = {},
             .trans = {},
-            .error = { -3, -1, 0, -3, -2, 0, 1, 2, 3, 0, -3, 0 }
+            .error = { -3, -2, 0, -3, -1, 0, 2, 1, 3, 0, -3, 0 }
         };
 
         check_system( store, *aig, system );

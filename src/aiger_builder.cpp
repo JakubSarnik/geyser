@@ -3,6 +3,10 @@
 #include <format>
 #include <unordered_set>
 
+// The Aiger to CNF conversion is heavily inspired by the code in IC3Ref
+// by Aaron Bradley with the important difference that we don't trivially map
+// Aiger variable IDs onto our solver variable IDs.
+
 namespace geyser::builder
 {
 
@@ -114,72 +118,6 @@ cnf_formula clausify_subgraph( context& ctx, aiger_literal root )
     return result;
 }
 
-} // namespace <anonymous>
-
-std::expected< transition_system, std::string > build_from_aiger( variable_store& store, aiger& aig )
-{
-    if ( aig.num_outputs + aig.num_bad != 1 )
-        return std::unexpected( std::format( "The input AIG has to contain precisely"
-                                             "one output (aiger <1.9) or precisely one bad specification"
-                                             "(aiger 1.9). The input contains {} outputs and {} bad specifications",
-                                             aig.num_outputs, aig.num_bad ));
-
-    if ( aig.num_fairness > 0 || aig.num_justice > 0 )
-        return std::unexpected( "Aiger justice constraints and fairness properties"
-                                " are not supported." );
-
-    if ( aig.num_constraints > 0 )
-        return std::unexpected( "NOT IMPLEMENTED: aiger 1.9 invariant constraints are not"
-                                " implemented yet" );
-
-    // clausify_subgraph depends on ordering of ANDs where each line refers
-    // only to literals from previous lines. This, among other things, is
-    // ensured by reencoding the AIG.
-    if ( aiger_is_reencoded( &aig ) == 0 )
-        aiger_reencode( &aig );
-
-    auto ctx = make_context( store, aig );
-
-    auto init = build_init( ctx );
-    auto trans = build_trans( ctx );
-    auto error = build_error( ctx );
-
-    return transition_system{ ctx.input_vars, ctx.state_vars, ctx.next_state_vars,
-                              std::move( init ), std::move( trans ), std::move( error ) };
-}
-
-context make_context( variable_store& store, aiger& aig )
-{
-    return context
-    {
-        .aig = &aig,
-
-        .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
-        {
-            return symbol_to_string( "y", i, aig.inputs[ i ] );
-        }),
-
-        .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-        {
-            return symbol_to_string( "x", i, aig.latches[ i ] );
-        }),
-
-        .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-        {
-            return symbol_to_string( "x'", i, aig.latches[ i ] );
-        }),
-
-        .and_vars = store.make_range( int( aig.num_ands ), []( int i )
-        {
-            return std::format("and[{}]", i);
-        } )
-    };
-}
-
-// The Aiger to CNF conversion is heavily inspired by the code in IC3Ref
-// by Aaron Bradley with the important difference that we don't trivially map
-// Aiger variable IDs onto our solver variable IDs.
-
 cnf_formula build_init( context& ctx )
 {
     auto init = cnf_formula{};
@@ -236,6 +174,71 @@ cnf_formula build_error( context& ctx )
     error.add_clause( from_aiger_lit( ctx, error_literal ) );
 
     return error;
+}
+
+} // namespace <anonymous>
+
+std::expected< transition_system, std::string > build_from_aiger( variable_store& store, aiger& aig )
+{
+    return make_context( store, aig ).transform(
+            []( context ctx ){ return build_from_context( ctx ); } );
+}
+
+std::expected< context, std::string > make_context( variable_store& store, aiger& aig )
+{
+    if ( aig.num_outputs + aig.num_bad != 1 )
+        return std::unexpected( std::format( "The input AIG has to contain precisely"
+                                             "one output (aiger <1.9) or precisely one bad specification"
+                                             "(aiger 1.9). The input contains {} outputs and {} bad specifications",
+                                             aig.num_outputs, aig.num_bad ));
+
+    if ( aig.num_fairness > 0 || aig.num_justice > 0 )
+        return std::unexpected( "Aiger justice constraints and fairness properties"
+                                " are not supported." );
+
+    if ( aig.num_constraints > 0 )
+        return std::unexpected( "NOT IMPLEMENTED: aiger 1.9 invariant constraints are not"
+                                " implemented yet" );
+
+    // clausify_subgraph depends on ordering of ANDs where each line refers
+    // only to literals from previous lines. This, among other things, is
+    // ensured by reencoding the AIG.
+    if ( aiger_is_reencoded( &aig ) == 0 )
+        aiger_reencode( &aig );
+
+    return context
+    {
+        .aig = &aig,
+
+        .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
+        {
+            return symbol_to_string( "y", i, aig.inputs[ i ] );
+        }),
+
+        .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
+        {
+            return symbol_to_string( "x", i, aig.latches[ i ] );
+        }),
+
+        .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
+        {
+            return symbol_to_string( "x'", i, aig.latches[ i ] );
+        }),
+
+        .and_vars = store.make_range( int( aig.num_ands ), []( int i )
+        {
+            return std::format("and[{}]", i);
+        } )
+    };
+}
+
+transition_system build_from_context( context& ctx )
+{
+    return transition_system
+    {
+        ctx.input_vars, ctx.state_vars, ctx.next_state_vars,
+        build_init( ctx ), build_trans( ctx ), build_error( ctx )
+    };
 }
 
 } // namespace geyser::builder

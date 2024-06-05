@@ -60,10 +60,11 @@ inline literal from_aiger_lit( context& ctx, aiger_literal lit )
 [[nodiscard]]
 std::expected< transition_system, std::string > build_from_aiger( variable_store& store, aiger& aig );
 
-context make_context( variable_store& store, aiger& aig );
+[[nodiscard]]
+std::expected< context, std::string > make_context( variable_store& store, aiger& aig );
 
-cnf_formula build_init( context& ctx );
-cnf_formula build_trans( context& ctx );
-cnf_formula build_error( context& ctx );
+[[nodiscard]]
+transition_system build_from_context( context& ctx );
+
 
 } // namespace geyser::builder

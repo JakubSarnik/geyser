@@ -38,6 +38,10 @@ public:
         assert( _next_state_vars.second - _next_state_vars.first == _state_vars.second - _state_vars.first );
     }
 
+    [[nodiscard]] var_id_range input_vars() const { return _input_vars; };
+    [[nodiscard]] var_id_range state_vars() const { return _state_vars; };
+    [[nodiscard]] var_id_range next_state_vars() const { return _next_state_vars; };
+
     [[nodiscard]] const cnf_formula& init() const { return _init; }
     [[nodiscard]] const cnf_formula& trans() const { return _trans; }
     [[nodiscard]] const cnf_formula& error() const { return _error; }

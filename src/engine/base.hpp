@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <print>
 
 namespace geyser
 {
@@ -32,10 +33,38 @@ using result = std::variant< ok, unknown, counterexample >;
 
 class engine
 {
+    virtual result do_run() = 0;
+
+protected:
+    const options* _opts = nullptr;
+    variable_store* _store = nullptr;
+    const transition_system* _system = nullptr;
+
+    template< class... Args >
+    void trace( std::format_string<Args...> fmt, Args&&... args )
+    {
+        if ( _opts->verbosity == verbosity::loud )
+            std::println( fmt, std::forward< Args... >( args... ) );
+    }
+
 public:
+    explicit engine( const options& opts ) : _opts{ &opts } {}
+
+    engine( const engine& ) = delete;
+    engine( engine&& ) = delete;
+
+    engine& operator=( const engine& ) = delete;
+    engine& operator=( engine&& ) = delete;
+
     virtual ~engine() = default;
 
-    virtual result run( const transition_system& system, const options& opts ) = 0;
+    [[nodiscard]] result run( variable_store& store, const transition_system& system )
+    {
+        _store = &store;
+        _system = &system;
+
+        return do_run();
+    }
 };
 
 } // namespace geyser

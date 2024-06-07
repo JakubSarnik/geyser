@@ -11,8 +11,6 @@
 namespace geyser
 {
 
-using var_id_range = std::pair< int, int >;
-
 class variable
 {
     int _id;
@@ -29,6 +27,22 @@ public:
 };
 
 using valuation = std::unordered_map< variable, bool >;
+
+using var_id_range = std::pair< int, int >;
+
+inline int var_count( var_id_range range )
+{
+    int diff = range.second - range.first;
+    assert( diff >= 0 );
+
+    return diff;
+}
+
+inline bool range_contains( var_id_range range, variable var )
+{
+    const auto id = var.id();
+    return range.first <= id && id < range.second;
+}
 
 class literal
 {
@@ -151,6 +165,17 @@ public:
     }
 
     [[nodiscard]] const std::vector< literal >& literals() const { return _literals; }
+
+    cnf_formula map( const std::regular_invocable< literal > auto& f ) const
+    {
+        auto res = cnf_formula{};
+        res._literals.reserve( _literals.size() );
+
+        for ( auto i = 0uz; i < _literals.size(); ++i )
+            res._literals[ i ] = f( _literals[ i ] );
+
+        return res;
+    }
 };
 
 } // namespace geyser

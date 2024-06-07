@@ -236,7 +236,7 @@ transition_system build_from_context( context& ctx )
 {
     return transition_system
     {
-        ctx.input_vars, ctx.state_vars, ctx.next_state_vars,
+        ctx.input_vars, ctx.state_vars, ctx.next_state_vars, ctx.and_vars,
         build_init( ctx ), build_trans( ctx ), build_error( ctx )
     };
 }

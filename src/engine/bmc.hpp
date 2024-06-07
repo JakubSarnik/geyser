@@ -13,6 +13,8 @@ class bmc : public engine
 {
     using engine::engine;
 
+    using vars = std::vector< var_id_range >;
+
     std::unique_ptr< CaDiCaL::Solver > _solver;
 
     // Each state variable x in X (the set of state variables) occurs in various
@@ -22,10 +24,11 @@ class bmc : public engine
     // a_4 and b_4 will have IDs in range _versioned_state_vars[ 4 ] = [k, l)
     // for some integers k <= l. As a minor optimization, a_0 and b_0 are the
     // original variables a, b (i.e. a_0 has id 4, b_0 has id 5). The same is
-    // true for input variables y in Y.
+    // true for input variables y in Y and auxiliary/tseitin/and variables.
 
-    std::vector< var_id_range > _versioned_state_vars;
-    std::vector< var_id_range > _versioned_input_vars;
+    vars _versioned_state_vars;
+    vars _versioned_input_vars;
+    vars _versioned_aux_vars;
 
     // A cache for versioned transition formulas. _versioned_trans[ i ] is the
     // formula Trans(X_i, Y_i, X_{i + 1}).
@@ -45,13 +48,13 @@ class bmc : public engine
     {
         _versioned_state_vars.push_back( _system->state_vars() );
         _versioned_input_vars.push_back( _system->input_vars() );
+        _versioned_aux_vars.push_back( _system->aux_vars() );
     }
 
     std::optional< counterexample > check_for( int step );
 
     void setup_solver( int bound );
     const cnf_formula& make_trans( int step );
-    void ensure_versioned_vars( int step );
 };
 
 } // namespace geyser

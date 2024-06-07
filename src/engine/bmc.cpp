@@ -58,28 +58,62 @@ void bmc::setup_solver( int bound )
         assert_formula( make_trans( i ) );
 }
 
+// Make the formula Trans(X_{step}, Y_{step}, X_{step + 1}).
+// If the maximum step for a call to make_trans was k, a call is only allowed
+// for make_trans( i ) where 0 <= i <= k + 1.
 const cnf_formula& bmc::make_trans( int step )
 {
+    assert( step >= 0 );
+
     if ( step < _versioned_trans.size() )
         return _versioned_trans[ step ];
 
-    ensure_versioned_vars( step );
+    assert( step == _versioned_trans.size() );
 
-    // TODO
-}
+    trace( "Making new transition formula for step {}", step );
 
-void bmc::ensure_versioned_vars( int step )
-{
-    const auto filler = [ step ]( std::vector< var_id_range >& versioned_vars )
+    // Ensure that versioned variables exist in versions from 0 up to size + 1
+    // (the + 1 is there to accommodate next state variables).
+    const auto make_vars = [ & ]( var_id_range unversioned, vars& versioned )
     {
-        while ( versioned_vars.size() < step )
+        while ( versioned.size() <= step + 1 )
         {
-            // TODO: We need to unversion the var here in order to get the original name
+            versioned.push_back( _store->make_range( var_count( unversioned ), [ & ]( int i )
+            {
+                return std::format( "{}/{}", _store->get_name( variable{ unversioned.first + i } ), step );
+            } ));
         }
     };
 
-    filler( _versioned_state_vars );
-    filler( _versioned_input_vars );
+    make_vars( _system->state_vars(), _versioned_state_vars);
+    make_vars( _system->input_vars(), _versioned_input_vars );
+    make_vars( _system->aux_vars(), _versioned_aux_vars );
+
+    assert( step + 1 < _versioned_state_vars.size() );
+    assert( step < _versioned_input_vars.size() );
+    assert( step < _versioned_aux_vars.size() );
+
+    return _versioned_trans.emplace_back( _system->trans().map( [ & ]( literal lit )
+    {
+        const auto input_base = _versioned_input_vars[ step ].first;
+        const auto state_base = _versioned_state_vars[ step ].first;
+        const auto next_state_base = _versioned_state_vars[ step + 1 ].first;
+        const auto aux_base = _versioned_aux_vars[ step ].first;
+
+        const auto [ type, pos ] = _system->get_var_info( lit.var() );
+
+        switch ( type )
+        {
+            case var_type::input:
+                return literal{ variable{ input_base + pos }, !lit.sign() };
+            case var_type::state:
+                return literal{ variable{ state_base + pos }, !lit.sign() };
+            case var_type::next_state:
+                return literal{ variable{ next_state_base + pos }, !lit.sign() };
+            case var_type::auxiliary:
+                return literal{ variable{ aux_base + pos }, !lit.sign() };
+        }
+    } ) );
 }
 
 } // namespace geyser

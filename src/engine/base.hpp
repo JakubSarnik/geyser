@@ -36,8 +36,8 @@ class engine
     virtual result do_run() = 0;
 
 protected:
-    const options* _opts = nullptr;
-    variable_store* _store = nullptr;
+    const options* _opts;
+    variable_store* _store;
     const transition_system* _system = nullptr;
 
     template< class... Args >
@@ -48,7 +48,7 @@ protected:
     }
 
 public:
-    explicit engine( const options& opts ) : _opts{ &opts } {}
+    engine( const options& opts, variable_store& store ) : _opts{ &opts }, _store{ &store } {}
 
     engine( const engine& ) = delete;
     engine( engine&& ) = delete;
@@ -58,11 +58,9 @@ public:
 
     virtual ~engine() = default;
 
-    [[nodiscard]] result run( variable_store& store, const transition_system& system )
+    [[nodiscard]] result run( const transition_system& system )
     {
-        _store = &store;
         _system = &system;
-
         return do_run();
     }
 };

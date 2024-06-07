@@ -20,6 +20,45 @@ std::vector< int > to_nums( const cnf_formula& formula )
 
 } // namespace <anonymous>
 
+TEST_CASE( "Variable ranges have the expected counts" )
+{
+    SECTION( "Empty range" )
+    {
+        REQUIRE( var_count( { 1, 1 } ) == 0 );
+        REQUIRE( var_count( { 3, 3 } ) == 0 );
+    }
+
+    SECTION( "Unit range" )
+    {
+        REQUIRE( var_count( { 1, 2 } ) == 1 );
+        REQUIRE( var_count( { 3, 4 } ) == 1 );
+    }
+
+    SECTION( "Longer range" )
+    {
+        REQUIRE( var_count( { 1, 5 } ) == 4 );
+        REQUIRE( var_count( { 15, 20 } ) == 5 );
+    }
+}
+
+TEST_CASE( "Variable ranges contain what they should contain" )
+{
+    SECTION( "Element is there" )
+    {
+        REQUIRE( range_contains( { 1, 9 }, variable{ 1 } ) );
+        REQUIRE( range_contains( { 1, 9 }, variable{ 3 } ) );
+        REQUIRE( range_contains( { 1, 9 }, variable{ 6 } ) );
+    }
+
+    SECTION( "Element is not there" )
+    {
+        REQUIRE( !range_contains( { 1, 9 }, variable{ 9 } ) );
+        REQUIRE( !range_contains( { 1, 9 }, variable{ 10 } ) );
+        REQUIRE( !range_contains( { 1, 9 }, variable{ 15 } ) );
+        REQUIRE( !range_contains( { 3, 6 }, variable{ 2 } ) );
+    }
+}
+
 TEST_CASE( "Variables have the expected ids" )
 {
     auto store = variable_store{};

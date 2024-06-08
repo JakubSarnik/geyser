@@ -20,45 +20,6 @@ std::vector< int > to_nums( const cnf_formula& formula )
 
 } // namespace <anonymous>
 
-TEST_CASE( "Variable ranges have the expected counts" )
-{
-    SECTION( "Empty range" )
-    {
-        REQUIRE( var_count( { 1, 1 } ) == 0 );
-        REQUIRE( var_count( { 3, 3 } ) == 0 );
-    }
-
-    SECTION( "Unit range" )
-    {
-        REQUIRE( var_count( { 1, 2 } ) == 1 );
-        REQUIRE( var_count( { 3, 4 } ) == 1 );
-    }
-
-    SECTION( "Longer range" )
-    {
-        REQUIRE( var_count( { 1, 5 } ) == 4 );
-        REQUIRE( var_count( { 15, 20 } ) == 5 );
-    }
-}
-
-TEST_CASE( "Variable ranges contain what they should contain" )
-{
-    SECTION( "Element is there" )
-    {
-        REQUIRE( range_contains( { 1, 9 }, variable{ 1 } ) );
-        REQUIRE( range_contains( { 1, 9 }, variable{ 3 } ) );
-        REQUIRE( range_contains( { 1, 9 }, variable{ 6 } ) );
-    }
-
-    SECTION( "Element is not there" )
-    {
-        REQUIRE( !range_contains( { 1, 9 }, variable{ 9 } ) );
-        REQUIRE( !range_contains( { 1, 9 }, variable{ 10 } ) );
-        REQUIRE( !range_contains( { 1, 9 }, variable{ 15 } ) );
-        REQUIRE( !range_contains( { 3, 6 }, variable{ 2 } ) );
-    }
-}
-
 TEST_CASE( "Variables have the expected ids" )
 {
     auto store = variable_store{};
@@ -92,19 +53,95 @@ TEST_CASE( "Variables have the expected names" )
     REQUIRE( store.get_name( variable{ 1 } ) == "foo" );
 }
 
+TEST_CASE( "Variable ranges have the expected sizes" )
+{
+    SECTION( "Empty range" )
+    {
+        REQUIRE( variable_range{ 1, 1 }.size() == 0 );
+        REQUIRE( variable_range{ 3, 3 }.size() == 0 );
+    }
+
+    SECTION( "Unit range" )
+    {
+        REQUIRE( variable_range{ 1, 2 }.size() == 1 );
+        REQUIRE( variable_range{ 3, 4 }.size() == 1 );
+    }
+
+    SECTION( "Longer range" )
+    {
+        REQUIRE( variable_range{ 1, 5 }.size() == 4 );
+        REQUIRE( variable_range{ 15, 20 }.size() == 5 );
+    }
+}
+
+TEST_CASE( "Variable ranges contain what they should contain" )
+{
+    SECTION( "Element is there" )
+    {
+        REQUIRE( variable_range{ 1, 9 }.contains( variable{ 1 } ) );
+        REQUIRE( variable_range{ 1, 9 }.contains( variable{ 3 } ) );
+        REQUIRE( variable_range{ 1, 9 }.contains( variable{ 6 } ) );
+    }
+
+    SECTION( "Element is not there" )
+    {
+        REQUIRE( !variable_range{ 1, 9 }.contains( variable{ 9 } ) );
+        REQUIRE( !variable_range{ 1, 9 }.contains( variable{ 10 } ) );
+        REQUIRE( !variable_range{ 1, 9 }.contains( variable{ 15 } ) );
+        REQUIRE( !variable_range{ 3, 6 }.contains( variable{ 2 } ) );
+    }
+}
+
+TEST_CASE( "Variable ranges are correctly iterable" )
+{
+    const auto range = variable_range{ 4, 6 };
+    auto it = range.begin();
+
+    REQUIRE( *it == variable{ 4 } );
+
+    it++;
+    REQUIRE( *it == variable{ 5 } );
+
+    ++it;
+    REQUIRE( it == range.end() );
+
+    it--;
+    --it;
+    REQUIRE( it == range.begin() );
+}
+
+TEST_CASE( "Nth and offset works for ranges" )
+{
+    const auto range = variable_range{ 2, 5 };
+
+    REQUIRE( range.nth( 0 ) == variable{ 2 } );
+    REQUIRE( range.nth( 1 ) == variable{ 3 } );
+    REQUIRE( range.nth( 2 ) == variable{ 4 } );
+
+    REQUIRE( range.offset( variable{ 2 } ) == 0 );
+    REQUIRE( range.offset( variable{ 3 } ) == 1 );
+    REQUIRE( range.offset( variable{ 4 } ) == 2 );
+}
+
 TEST_CASE( "Variable store hands out ranges correctly" )
 {
     auto store = variable_store{};
 
-    const auto [ a, b ] = store.make_range( 3 );
+    const auto r1 = store.make_range( 3 );
 
-    REQUIRE( a == 1 );
-    REQUIRE( b == 4 );
+    REQUIRE( r1.size() == 3 );
+    REQUIRE( r1.contains( variable{ 1 } ) );
+    REQUIRE( r1.contains( variable{ 2 } ) );
+    REQUIRE( r1.contains( variable{ 3 } ) );
 
-    const auto [ c, d ] = store.make_range( 5 );
+    const auto r2 = store.make_range( 5 );
 
-    REQUIRE( c == 4 );
-    REQUIRE( d == 9 );
+    REQUIRE( r2.size() == 5 );
+    REQUIRE( r2.contains( variable{ 4 } ) );
+    REQUIRE( r2.contains( variable{ 5 } ) );
+    REQUIRE( r2.contains( variable{ 6 } ) );
+    REQUIRE( r2.contains( variable{ 7 } ) );
+    REQUIRE( r2.contains( variable{ 8 } ) );
 }
 
 TEST_CASE( "Ranges are named correctly" )
@@ -113,10 +150,10 @@ TEST_CASE( "Ranges are named correctly" )
 
     SECTION( "when no name is present" )
     {
-        const auto [ a, b ] = store.make_range( 4 );
+        const auto range = store.make_range( 4 );
 
-        for ( auto i = a; i < b; ++i )
-            REQUIRE( store.get_name( variable{ i } ) == "" );
+        for ( const auto var : range )
+            REQUIRE( store.get_name( var ) == "" );
     }
 
     SECTION( "when a constant name is present" )
@@ -126,10 +163,10 @@ TEST_CASE( "Ranges are named correctly" )
             return "name";
         };
 
-        const auto [ a, b ] = store.make_range( 4, namer );
+        const auto range = store.make_range( 4, namer );
 
-        for ( auto i = a; i < b; ++i )
-            REQUIRE( store.get_name( variable{ i } ) == "name" );
+        for ( const auto var : range )
+            REQUIRE( store.get_name( var ) == "name" );
     }
 
     SECTION( "when a dynamic name is present" )
@@ -139,11 +176,11 @@ TEST_CASE( "Ranges are named correctly" )
             return std::format("x{}", i);
         };
 
-        const auto [ a, b ] = store.make_range( 3, namer );
+        const auto range = store.make_range( 3, namer );
 
-        REQUIRE( store.get_name( variable{ a } ) == "x0" );
-        REQUIRE( store.get_name( variable{ a + 1 } ) == "x1" );
-        REQUIRE( store.get_name( variable{ a + 2 } ) == "x2" );
+        REQUIRE( store.get_name( range.nth( 0 ) ) == "x0" );
+        REQUIRE( store.get_name( range.nth( 1 ) ) == "x1" );
+        REQUIRE( store.get_name( range.nth( 2 ) ) == "x2" );
     }
 }
 
@@ -198,6 +235,17 @@ TEST_CASE( "Literals of different polarity are different" )
     auto lit = literal{ var };
 
     REQUIRE( lit != !lit );
+}
+
+TEST_CASE( "Literal substitution works as expected" )
+{
+    const auto v1 = variable{ 1 };
+    const auto v2 = variable{ 2 };
+
+    const auto lit = literal{ v1 };
+
+    REQUIRE( lit.substitute( v2 ) == literal{ v2 } );
+    REQUIRE( (!lit).substitute( v2 ) == !literal{ v2 } );
 }
 
 TEST_CASE( "CNF formula is built correctly using add_clause" )

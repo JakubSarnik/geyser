@@ -19,11 +19,6 @@ aiger_ptr read_aiger( const char* str )
     return aig;
 }
 
-int amount_of( var_id_range range )
-{
-    return range.second - range.first;
-}
-
 std::vector< literal > to_literals( const std::vector< int >& nums )
 {
     auto res = std::vector< literal >{};
@@ -63,12 +58,12 @@ struct expected_counts
     int and_vars;
 };
 
-void check_counts( const context& ctx, const expected_counts& expected )
+void check_sizes( const context& ctx, const expected_counts& expected )
 {
-    REQUIRE( amount_of( ctx.input_vars ) == expected.input_vars );
-    REQUIRE( amount_of( ctx.state_vars ) == expected.state_vars );
-    REQUIRE( amount_of( ctx.next_state_vars ) == expected.next_state_vars );
-    REQUIRE( amount_of( ctx.and_vars ) == expected.and_vars );
+    REQUIRE( ctx.input_vars.size() == expected.input_vars );
+    REQUIRE( ctx.state_vars.size() == expected.state_vars );
+    REQUIRE( ctx.next_state_vars.size() == expected.next_state_vars );
+    REQUIRE( ctx.and_vars.size() == expected.and_vars );
 }
 
 } // namespace <anonymous>
@@ -110,14 +105,14 @@ TEST_CASE( "Buffer gate" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
             .input_vars = 1,
             .state_vars = 0,
             .next_state_vars = 0,
             .and_vars = 0
         } );
 
-        const auto input = literal{ variable{ get_var( ctx->input_vars, 0 ) } };
+        const auto input = literal{ ctx->input_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == input );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !input );
@@ -153,14 +148,14 @@ TEST_CASE( "Inverter gate" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 1,
                 .state_vars = 0,
                 .next_state_vars = 0,
                 .and_vars = 0
         } );
 
-        const auto input = literal{ variable{ get_var( ctx->input_vars, 0 ) } };
+        const auto input = literal{ ctx->input_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == input );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !input );
@@ -198,16 +193,16 @@ TEST_CASE( "And gate" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 2,
                 .state_vars = 0,
                 .next_state_vars = 0,
                 .and_vars = 1
         } );
 
-        const auto in0 = literal{ variable{ get_var( ctx->input_vars, 0 ) } };
-        const auto in1 = literal{ variable{ get_var( ctx->input_vars, 1 ) } };
-        const auto cnj = literal{ variable{ get_var( ctx->and_vars,   0 ) } };
+        const auto in0 = literal{ ctx->input_vars.nth( 0 ) };
+        const auto in1 = literal{ ctx->input_vars.nth( 1 ) };
+        const auto cnj = literal{ ctx->and_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == in0 );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !in0 );
@@ -255,16 +250,16 @@ TEST_CASE( "Or gate" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 2,
                 .state_vars = 0,
                 .next_state_vars = 0,
                 .and_vars = 1
         } );
 
-        const auto in0 = literal{ variable{ get_var( ctx->input_vars, 0 ) } };
-        const auto in1 = literal{ variable{ get_var( ctx->input_vars, 1 ) } };
-        const auto cnj = literal{ variable{ get_var( ctx->and_vars,   0 ) } };
+        const auto in0 = literal{ ctx->input_vars.nth( 0 ) };
+        const auto in1 = literal{ ctx->input_vars.nth( 1 ) };
+        const auto cnj = literal{ ctx->and_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == in0 );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !in0 );
@@ -304,14 +299,14 @@ TEST_CASE( "Constant latch initialized with false" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 0,
                 .state_vars = 1,
                 .next_state_vars = 1,
                 .and_vars = 0
         } );
 
-        const auto x = literal{ variable{ get_var( ctx->state_vars, 0 ) } };
+        const auto x = literal{ ctx->state_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == x );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !x );
@@ -347,14 +342,14 @@ TEST_CASE( "Constant latch initialized with true" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 0,
                 .state_vars = 1,
                 .next_state_vars = 1,
                 .and_vars = 0
         } );
 
-        const auto x = literal{ variable{ get_var( ctx->state_vars, 0 ) } };
+        const auto x = literal{ ctx->state_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == x );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !x );
@@ -390,14 +385,14 @@ TEST_CASE( "Simple flip flop" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 0,
                 .state_vars = 1,
                 .next_state_vars = 1,
                 .and_vars = 0
         } );
 
-        const auto x = literal{ variable{ get_var( ctx->state_vars, 0 ) } };
+        const auto x = literal{ ctx->state_vars.nth( 0 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == x );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !x );
@@ -439,20 +434,20 @@ TEST_CASE( "More complicated flip flop" )
     {
         REQUIRE( ctx->aig == aig.get() );
 
-        check_counts( *ctx, {
+        check_sizes( *ctx, {
                 .input_vars = 2,
                 .state_vars = 1,
                 .next_state_vars = 1,
                 .and_vars = 4
         } );
 
-        const auto y0 = literal{ variable{ get_var( ctx->input_vars, 0 ) } };
-        const auto y1 = literal{ variable{ get_var( ctx->input_vars, 1 ) } };
-        const auto x0 = literal{ variable{ get_var( ctx->state_vars, 0 ) } };
-        const auto a0 = literal{ variable{ get_var( ctx->and_vars, 0 ) } };
-        const auto a1 = literal{ variable{ get_var( ctx->and_vars, 1 ) } };
-        const auto a2 = literal{ variable{ get_var( ctx->and_vars, 2 ) } };
-        const auto a3 = literal{ variable{ get_var( ctx->and_vars, 3 ) } };
+        const auto y0 = literal{ ctx->input_vars.nth( 0 ) };
+        const auto y1 = literal{ ctx->input_vars.nth( 1 ) };
+        const auto x0 = literal{ ctx->state_vars.nth( 0 ) };
+        const auto a0 = literal{ ctx->and_vars.nth( 0 ) };
+        const auto a1 = literal{ ctx->and_vars.nth( 1 ) };
+        const auto a2 = literal{ ctx->and_vars.nth( 2 ) };
+        const auto a3 = literal{ ctx->and_vars.nth( 3 ) };
 
         REQUIRE( from_aiger_lit( *ctx, 2 ) == y0 );
         REQUIRE( from_aiger_lit( *ctx, 3 ) == !y0 );

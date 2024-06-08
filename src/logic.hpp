@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <concepts>
+#include <iterator>
 #include <cassert>
 #include <cmath>
 
@@ -16,7 +17,7 @@ class variable
     int _id;
 
 public:
-    explicit variable( int id ) : _id{ id } // NOLINT
+    explicit variable( int id ) : _id{ id }
     {
         assert( id > 0 );
     }
@@ -26,23 +27,80 @@ public:
     friend auto operator<=>( variable, variable ) = default;
 };
 
+class variable_range
+{
+    int _begin;
+    int _end;
+
+public:
+    // So much ceremony for such a simple thing, ugh...
+    class iterator
+    {
+        int _i;
+
+    public:
+        using iterator_category = std::bidirectional_iterator_tag;
+        using difference_type   = int;
+        using value_type        = variable;
+        using pointer           = const variable*;  // or also value_type*
+        using reference         = const variable&;  // or also value_type&
+
+        iterator() : _i{ 0 } {}
+        explicit iterator( int i ) : _i{ i } {}
+
+        variable operator*() const { return variable{ _i }; }
+        iterator& operator++() { ++_i; return *this; }
+        iterator& operator--() { --_i; return *this; }
+
+        iterator operator++( int )
+        {
+            const auto copy = *this;
+            operator++();
+            return copy;
+        }
+
+        iterator operator--( int )
+        {
+            const auto copy = *this;
+            operator--();
+            return copy;
+        }
+
+        friend auto operator<=>( iterator, iterator ) = default;
+    };
+
+    // Construct a range representing variables in range [begin, end).
+    variable_range( int begin, int end ) : _begin{ begin }, _end{ end }
+    {
+        assert( begin > 0 );
+        assert( begin <= end );
+    }
+
+    [[nodiscard]] int size() const { return _end - _begin; }
+
+    [[nodiscard]] bool contains( variable var ) const
+    {
+        return _begin <= var.id() && var.id() < _end;
+    }
+
+    [[nodiscard]] variable nth( int n ) const
+    {
+        const auto var = variable{ _begin + n };
+        assert( contains( var ) );
+        return var;
+    }
+
+    [[nodiscard]] int offset( variable var ) const
+    {
+        assert( contains( var ) );
+        return( var.id() - _begin );
+    }
+
+    [[nodiscard]] iterator begin() const { return iterator{ _begin }; }
+    [[nodiscard]] iterator end() const { return iterator{ _end }; }
+};
+
 using valuation = std::unordered_map< variable, bool >;
-
-using var_id_range = std::pair< int, int >;
-
-inline int var_count( var_id_range range )
-{
-    int diff = range.second - range.first;
-    assert( diff >= 0 );
-
-    return diff;
-}
-
-inline bool range_contains( var_id_range range, variable var )
-{
-    const auto id = var.id();
-    return range.first <= id && id < range.second;
-}
 
 class literal
 {
@@ -62,6 +120,11 @@ public:
     friend literal operator!( literal lit )
     {
         return literal{ -lit._value };
+    }
+
+    [[nodiscard]] literal substitute( variable var ) const
+    {
+        return literal{ var, !sign() };
     }
 
     [[nodiscard]] int value() const { return _value; }
@@ -97,7 +160,7 @@ public:
     // the variable and returns its name. Returns a left-inclusive, right-exclusive
     // pair of delimiting IDs.
     [[nodiscard]]
-    std::pair< int, int > make_range( int n, const std::regular_invocable< int > auto& namer )
+    variable_range make_range( int n, const std::regular_invocable< int > auto& namer )
     {
         const auto fst = get_next_id();
 
@@ -110,7 +173,7 @@ public:
     }
 
     [[nodiscard]]
-    std::pair< int, int > make_range( int n )
+    variable_range make_range( int n )
     {
         const auto namer = []( int )
         {

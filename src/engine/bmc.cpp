@@ -74,14 +74,14 @@ const cnf_formula& bmc::make_trans( int step )
 
     // Ensure that versioned variables exist in versions from 0 up to size + 1
     // (the + 1 is there to accommodate next state variables).
-    const auto make_vars = [ & ]( var_id_range unversioned, vars& versioned )
+    const auto make_vars = [ & ]( variable_range unversioned, vars& versioned )
     {
         while ( versioned.size() <= step + 1 )
         {
-            versioned.push_back( _store->make_range( var_count( unversioned ), [ & ]( int i )
+            versioned.push_back( _store->make_range( unversioned.size(), [ & ]( int i )
             {
-                return std::format( "{}/{}", _store->get_name( variable{ unversioned.first + i } ), step );
-            } ));
+                return std::format( "{}/{}", _store->get_name( unversioned.nth( i ) ), step );
+            } ) );
         }
     };
 
@@ -93,25 +93,25 @@ const cnf_formula& bmc::make_trans( int step )
     assert( step < _versioned_input_vars.size() );
     assert( step < _versioned_aux_vars.size() );
 
+    const auto ins = _versioned_input_vars[ step ];
+    const auto here = _versioned_state_vars[ step ];
+    const auto there = _versioned_state_vars[ step + 1 ];
+    const auto aux = _versioned_aux_vars[ step ];
+
     return _versioned_trans.emplace_back( _system->trans().map( [ & ]( literal lit )
     {
-        const auto input_base = _versioned_input_vars[ step ].first;
-        const auto state_base = _versioned_state_vars[ step ].first;
-        const auto next_state_base = _versioned_state_vars[ step + 1 ].first;
-        const auto aux_base = _versioned_aux_vars[ step ].first;
-
         const auto [ type, pos ] = _system->get_var_info( lit.var() );
 
         switch ( type )
         {
             case var_type::input:
-                return literal{ variable{ input_base + pos }, !lit.sign() };
+                return lit.substitute( ins.nth( pos ) );
             case var_type::state:
-                return literal{ variable{ state_base + pos }, !lit.sign() };
+                return lit.substitute( here.nth( pos ) );
             case var_type::next_state:
-                return literal{ variable{ next_state_base + pos }, !lit.sign() };
+                return lit.substitute( there.nth( pos ) );
             case var_type::auxiliary:
-                return literal{ variable{ aux_base + pos }, !lit.sign() };
+                return lit.substitute( aux.nth( pos ) );
         }
     } ) );
 }

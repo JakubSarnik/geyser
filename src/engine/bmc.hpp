@@ -13,7 +13,7 @@ class bmc : public engine
 {
     using engine::engine;
 
-    using vars = std::vector< var_id_range >;
+    using vars = std::vector< variable_range >;
 
     std::unique_ptr< CaDiCaL::Solver > _solver;
 

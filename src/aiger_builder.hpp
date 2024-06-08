@@ -16,21 +16,11 @@ struct context
 {
     aiger* aig;
 
-    var_id_range input_vars;
-    var_id_range state_vars;
-    var_id_range next_state_vars;
-    var_id_range and_vars;
+    variable_range input_vars;
+    variable_range state_vars;
+    variable_range next_state_vars;
+    variable_range and_vars;
 };
-
-inline variable get_var( var_id_range range, int index )
-{
-    const auto pos = range.first + index;
-
-    assert( pos >= range.first );
-    assert( pos < range.second );
-
-    return variable{ pos };
-}
 
 inline literal from_aiger_lit( context& ctx, aiger_literal lit )
 {
@@ -41,11 +31,11 @@ inline literal from_aiger_lit( context& ctx, aiger_literal lit )
         assert( var >= 2 ); // Not constants true/false
 
         if ( const auto *ptr = aiger_is_input( ctx.aig, var ); ptr )
-            return get_var( ctx.input_vars, int( ptr - ctx.aig->inputs ) );
+            return ctx.input_vars.nth( int( ptr - ctx.aig->inputs ) );
         if ( const auto *ptr = aiger_is_latch( ctx.aig, var ); ptr )
-            return get_var( ctx.state_vars, int( ptr - ctx.aig->latches ) );
+            return ctx.state_vars.nth( int( ptr - ctx.aig->latches ) );
         if ( const auto *ptr = aiger_is_and( ctx.aig, var ); ptr )
-            return get_var( ctx.and_vars, int( ptr - ctx.aig->ands ) );
+            return ctx.and_vars.nth( int( ptr - ctx.aig->ands ) );
 
         assert( false ); // Unreachable
     };

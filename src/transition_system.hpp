@@ -25,33 +25,29 @@ class transition_system
     // and the input variables. In addition, all three formulas might contain
     // additional auxiliary Tseitin variables.
 
-    var_id_range _input_vars;
-    var_id_range _state_vars;
-    var_id_range _next_state_vars;
-    var_id_range _aux_vars;
+    variable_range _input_vars;
+    variable_range _state_vars;
+    variable_range _next_state_vars;
+    variable_range _aux_vars;
 
     cnf_formula _init;
     cnf_formula _trans;
     cnf_formula _error;
 
 public:
-    transition_system( var_id_range input_vars, var_id_range state_vars, var_id_range next_state_vars,
-                       var_id_range aux_vars, cnf_formula init, cnf_formula trans, cnf_formula error )
+    transition_system( variable_range input_vars, variable_range state_vars, variable_range next_state_vars,
+                       variable_range aux_vars, cnf_formula init, cnf_formula trans, cnf_formula error )
             : _input_vars{ input_vars }, _state_vars{ state_vars }, _next_state_vars{ next_state_vars },
               _aux_vars{ aux_vars }, _init{ std::move( init ) }, _trans{ std::move( trans ) },
               _error{ std::move( error ) }
     {
-        assert( _input_vars.first <= _input_vars.second );
-        assert( _state_vars.first <= _state_vars.second );
-        assert( _aux_vars.first <= _aux_vars.second );
-        assert( _next_state_vars.first <= _next_state_vars.second );
-        assert( _next_state_vars.second - _next_state_vars.first == _state_vars.second - _state_vars.first );
+        assert( state_vars.size() == next_state_vars.size() );
     }
 
-    [[nodiscard]] var_id_range input_vars() const { return _input_vars; };
-    [[nodiscard]] var_id_range state_vars() const { return _state_vars; };
-    [[nodiscard]] var_id_range next_state_vars() const { return _next_state_vars; };
-    [[nodiscard]] var_id_range aux_vars() const { return _aux_vars; }
+    [[nodiscard]] variable_range input_vars() const { return _input_vars; };
+    [[nodiscard]] variable_range state_vars() const { return _state_vars; };
+    [[nodiscard]] variable_range next_state_vars() const { return _next_state_vars; };
+    [[nodiscard]] variable_range aux_vars() const { return _aux_vars; }
 
     [[nodiscard]] const cnf_formula& init() const { return _init; }
     [[nodiscard]] const cnf_formula& trans() const { return _trans; }
@@ -61,16 +57,14 @@ public:
     // variable range.
     [[nodiscard]] std::pair< var_type, int > get_var_info( variable var ) const
     {
-        const auto id = var.id();
-
-        if ( range_contains( _input_vars, var ) )
-            return { var_type::input, id - _input_vars.first };
-        if ( range_contains( _state_vars, var ) )
-            return { var_type::state, id - _state_vars.first };
-        if ( range_contains( _next_state_vars, var ) )
-            return { var_type::next_state, id - _next_state_vars.first };
-        if ( range_contains( _aux_vars, var ) )
-            return { var_type::auxiliary, id - _aux_vars.first };
+        if ( _input_vars.contains( var ) )
+            return { var_type::input, _input_vars.offset( var ) };
+        if ( _state_vars.contains( var ) )
+            return { var_type::state, _state_vars.offset( var ) };
+        if ( _next_state_vars.contains( var ) )
+            return { var_type::next_state, _next_state_vars.offset( var ) };
+        if ( _aux_vars.contains( var ) )
+            return { var_type::auxiliary, _aux_vars.offset( var ) };
 
         assert( false ); // Unreachable
     }

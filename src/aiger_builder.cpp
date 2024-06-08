@@ -131,7 +131,7 @@ cnf_formula build_init( context& ctx )
         // that the latch has a nondeterministic initial value.
 
         if ( aiger_is_constant( reset ) )
-            init.add_clause( literal{ get_var( ctx.state_vars, int( i ) ), reset == 0 } );
+            init.add_clause( literal{ ctx.state_vars.nth( int( i ) ), reset == 0 } );
     }
 
     return init;
@@ -147,7 +147,7 @@ cnf_formula build_trans( context& ctx )
 
     for ( auto i = 0u; i < ctx.aig->num_latches; ++i )
     {
-        const auto next = literal{ get_var( ctx.next_state_vars, int( i ) ) };
+        const auto next = literal{ ctx.next_state_vars.nth( int( i ) ) };
         const auto result_aig_literal = ctx.aig->latches[ i ].next;
 
         trans.add_cnf( clausify_subgraph( ctx, result_aig_literal ) );

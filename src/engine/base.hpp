@@ -41,7 +41,7 @@ protected:
     const transition_system* _system = nullptr;
 
     template< class... Args >
-    void trace( std::format_string<Args...> fmt, Args&&... args )
+    void trace( std::format_string<Args...> fmt, Args&&... args ) const
     {
         if ( _opts->verbosity == verbosity::loud )
             std::println( fmt, std::forward< Args... >( args... ) );

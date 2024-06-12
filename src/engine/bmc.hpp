@@ -15,7 +15,12 @@ class bmc : public engine
 
     using vars = std::vector< variable_range >;
 
+    // Each solver_refresh_rate iterations, reset the solver by throwing away
+    // all the accumulated (and disabled) error formulas.
+    constexpr static int solver_refresh_rate = 100;
+
     std::unique_ptr< CaDiCaL::Solver > _solver;
+    const transition_system* _system = nullptr;
 
     // Each state variable x in X (the set of state variables) occurs in various
     // versions x_0, x_1, ..., throughout the computation. We store the versioned
@@ -34,7 +39,9 @@ class bmc : public engine
     // formula Trans(X_i, Y_i, X_{i + 1}).
     std::vector< cnf_formula > _versioned_trans;
 
-    result do_run() override;
+    // _activators[ i ] is the activation literal (a positive variable) for
+    // formula Error(X_i).
+    std::vector< literal > _activators;
 
     void assert_formula( const cnf_formula& formula )
     {
@@ -46,15 +53,22 @@ class bmc : public engine
 
     void setup_versioning()
     {
+        assert( _system );
+
         _versioned_state_vars.push_back( _system->state_vars() );
         _versioned_input_vars.push_back( _system->input_vars() );
         _versioned_aux_vars.push_back( _system->aux_vars() );
     }
 
+    void refresh_solver( int bound );
     std::optional< counterexample > check_for( int step );
+    counterexample build_counterexample( int bound );
 
-    void setup_solver( int bound );
     const cnf_formula& make_trans( int step );
+    cnf_formula make_error( int step );
+
+public:
+    [[nodiscard]] result run( const transition_system& system ) override;
 };
 
 } // namespace geyser

@@ -229,13 +229,29 @@ public:
 
     [[nodiscard]] const std::vector< literal >& literals() const { return _literals; }
 
-    cnf_formula map( const std::regular_invocable< literal > auto& f ) const
+    [[nodiscard]] cnf_formula map( const std::regular_invocable< literal > auto& f ) const
     {
         auto res = cnf_formula{};
         res._literals.reserve( _literals.size() );
 
         for ( auto i = 0uz; i < _literals.size(); ++i )
             res._literals[ i ] = f( _literals[ i ] );
+
+        return res;
+    }
+
+    [[nodiscard]] cnf_formula activate( variable activator ) const
+    {
+        auto res = cnf_formula{};
+        res._literals.reserve( _literals.size() );
+
+        for ( const auto lit : _literals )
+        {
+            if ( lit == literal::separator )
+                res._literals.push_back( !literal{ activator } );
+
+            res._literals.push_back( lit );
+        }
 
         return res;
     }

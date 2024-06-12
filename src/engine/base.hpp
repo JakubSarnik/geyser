@@ -33,12 +33,9 @@ using result = std::variant< ok, unknown, counterexample >;
 
 class engine
 {
-    virtual result do_run() = 0;
-
 protected:
     const options* _opts;
     variable_store* _store;
-    const transition_system* _system = nullptr;
 
     template< class... Args >
     void trace( std::format_string<Args...> fmt, Args&&... args ) const
@@ -58,11 +55,7 @@ public:
 
     virtual ~engine() = default;
 
-    [[nodiscard]] result run( const transition_system& system )
-    {
-        _system = &system;
-        return do_run();
-    }
+    [[nodiscard]] virtual result run( const transition_system& system ) = 0;
 };
 
 } // namespace geyser

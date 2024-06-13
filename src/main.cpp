@@ -1,7 +1,6 @@
 #include "options.hpp"
 #include "caiger.hpp"
 #include <iostream>
-#include <memory>
 
 int main( int argc, char** argv ) {
     auto opts = geyser::parse_cli( argc, argv );

@@ -20,12 +20,16 @@ struct unknown
 
 class counterexample
 {
+    // Maps steps to inputs, i.e. valuations of input variables.
+    std::vector< valuation > _inputs;
     // Maps steps to states, i.e. valuations of state variables.
     std::vector< valuation > _states;
 
 public:
-    explicit counterexample( std::vector< valuation > states ) : _states{ std::move( states ) } {}
+    explicit counterexample( std::vector< valuation > inputs, std::vector< valuation > states )
+        : _inputs{ std::move( inputs ) }, _states{ std::move( states ) } {}
 
+    [[nodiscard]] const std::vector< valuation >& inputs() const { return _inputs; }
     [[nodiscard]] const std::vector< valuation >& states() const { return _states; }
 };
 

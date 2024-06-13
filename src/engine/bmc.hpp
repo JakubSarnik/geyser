@@ -60,9 +60,17 @@ class bmc : public engine
         _versioned_aux_vars.push_back( _system->aux_vars() );
     }
 
+    bool is_true( variable var )
+    {
+        assert( _solver );
+        assert( ( _solver->state() & CaDiCaL::SATISFIED ) != 0 );
+
+        return _solver->val( var.id() ) > 0;
+    }
+
     void refresh_solver( int bound );
     std::optional< counterexample > check_for( int step );
-    counterexample build_counterexample( int bound );
+    counterexample build_counterexample( int step );
 
     const cnf_formula& make_trans( int step );
     cnf_formula make_error( int step );

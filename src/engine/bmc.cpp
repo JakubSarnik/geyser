@@ -83,30 +83,30 @@ std::optional< counterexample > bmc::check_for( int step )
     return {};
 }
 
-counterexample bmc::build_counterexample( int bound )
+counterexample bmc::build_counterexample( int step )
 {
-    trace( "Found a counterexample, building for bound {}", bound );
+    trace( "Found a counterexample at step {}, building", step );
 
-    assert( bound >= 0 );
-    assert( bound < _versioned_state_vars.size() );
-    assert( bound < _versioned_input_vars.size() );
+    assert( step >= 0 );
+    assert( step <= _versioned_state_vars.size() );
+    assert( step <= _versioned_input_vars.size() );
 
-    auto states = std::vector< valuation >( bound );
+    auto inputs = std::vector< valuation >( step + 1 );
+    auto states = std::vector< valuation >( step + 1 );
 
-    for ( int i = 0; i < bound; ++i )
+    for ( int i = 0; i <= step; ++i )
     {
+        auto& input = inputs[ i ];
         auto& state = states[ i ];
 
-        for ( int vi = 0; vi < _system->state_vars().size(); ++vi )
-            state[ _system->state_vars().nth( vi ) ] =
-                    ( _solver->val( _versioned_state_vars[ i ].nth( vi ).id() ) > 0 );
-
         for ( int vi = 0; vi < _system->input_vars().size(); ++vi )
-            state[ _system->input_vars().nth( vi ) ] =
-                    ( _solver->val( _versioned_input_vars[ i ].nth( vi ).id() ) > 0 );
+            input[ _system->input_vars().nth( vi ) ] = is_true( _versioned_input_vars[ i ].nth( vi ) );
+
+        for ( int vi = 0; vi < _system->state_vars().size(); ++vi )
+            state[ _system->state_vars().nth( vi ) ] = is_true( _versioned_state_vars[ i ].nth( vi ) );
     }
 
-    return counterexample{ std::move( states ) };
+    return counterexample{ std::move( inputs ), std::move( states ) };
 }
 
 // Make the formula Trans(X_{step}, Y_{step}, X_{step + 1}).

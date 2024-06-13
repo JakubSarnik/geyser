@@ -59,16 +59,18 @@ std::optional< counterexample > bmc::check_for( int step )
     assert( step >= 0 );
     assert( _solver );
 
-    // From refresh_solver, we have
-    //    Init(X_0) /\ Trans(X_0, Y_0, X_1) /\ ... /\ Trans(X_{step - 1}, Y_{step - 1}, X_{step})
-    // already loaded. The solver also contains
-    //    Error(X_0) /\ Error(X_1) /\ ... /\ Error(X_{step - 1}),
-    // which must be now disabled.
-
-    for ( std::size_t i = 0; i < _activators.size() - 1; ++i )
-        _solver->assume( _activators[ i ].value() );
+    if ( step > 0 )
+        assert_formula( make_trans( step - 1 ) );
 
     assert_formula( make_error( step ) );
+
+    // The solver contains
+    //    Error(X_i) /\ Error(X_{i + 1}) /\ ... /\ Error(X_{step - 1}),
+    // for some i, which must be disabled.
+
+    for ( std::size_t i = 0; i < _activators.size() - 1; ++i )
+        _solver->assume( ( !_activators[ i ] ).value() );
+
     _solver->assume( _activators.back().value() );
 
     const auto res = _solver->solve();

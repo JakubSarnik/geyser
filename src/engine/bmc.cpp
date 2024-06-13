@@ -33,7 +33,7 @@ result bmc::run( const transition_system& system )
 }
 
 // Load the solver with
-//   Init(X_0) /\ Trans(X_0, Y_0, X_1) /\ ... /\ Trans(X_{bound - 1}, Y_{bound - 1}, X_{step})
+//   Init(X_0) /\ Trans(X_0, Y_0, X_1) /\ ... /\ Trans(X_{bound - 1}, Y_{bound - 1}, X_{bound})
 void bmc::refresh_solver( int bound )
 {
     trace( "Refreshing the solver after {} steps", bound );

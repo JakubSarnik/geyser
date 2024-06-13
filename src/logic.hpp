@@ -3,7 +3,7 @@
 #include <utility>
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <concepts>
 #include <iterator>
 #include <cassert>
@@ -100,7 +100,7 @@ public:
     [[nodiscard]] iterator end() const { return iterator{ _end }; }
 };
 
-using valuation = std::unordered_map< variable, bool >;
+using valuation = std::map< variable, bool >;
 
 class literal
 {

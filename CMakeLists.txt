@@ -37,7 +37,8 @@ add_library(geyser STATIC
         src/options.cpp
         src/engine/base.cpp
         src/engine/bmc.cpp
-        src/aiger_builder.cpp)
+        src/aiger_builder.cpp
+        src/witness_writer.cpp)
 
 target_link_libraries(geyser PUBLIC aiger)
 target_link_libraries(geyser PUBLIC cadical)

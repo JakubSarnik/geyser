@@ -2,6 +2,7 @@
 
 #include <string>
 #include <optional>
+#include <expected>
 
 namespace geyser
 {
@@ -21,6 +22,6 @@ struct options
     std::optional< int > bound; // In BMC, the upper bound on the length of a potential counterexample.
 };
 
-options parse_cli( int argc, char** argv );
+std::expected< options, std::string > parse_cli( int argc, char** argv );
 
 } // namespace geyser

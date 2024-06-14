@@ -16,10 +16,14 @@ enum class state
 namespace geyser
 {
 
-std::expected< options, std::string > parse_cli( int argc, char** argv )
+std::expected< options, std::string > parse_cli( int argc, char const* const* argv )
 {
-    auto opts = options{};
     auto state = state::anything;
+
+    auto bound = std::optional< int >{};
+    auto engine_name = std::optional< std::string >{};
+    auto input_file = std::optional< std::string >{};
+    auto verbosity = verbosity::silent;
 
     for ( int i = 1; i < argc; ++i )
     {
@@ -29,33 +33,42 @@ std::expected< options, std::string > parse_cli( int argc, char** argv )
         {
             case state::expecting_engine:
             {
-                opts.engine_name = arg;
+                engine_name = arg;
                 state = state::anything;
             } break;
 
             case state::expecting_bound:
             {
                 size_t chars;
-                int bound = std::stoi( arg, &chars );
+                int val;
 
-                if ( chars != arg.length() || bound < 0 )
+                try
+                {
+                    val = std::stoi( arg, &chars );
+                }
+                catch (...)
+                {
+                    return std::unexpected{ "the bound must be a valid positive number" };
+                }
+
+                if ( chars != arg.length() || val < 0 )
                     return std::unexpected{ "the bound must be a valid positive number" };
 
-                opts.bound = bound;
+                bound = val;
                 state = state::anything;
             } break;
 
             case state::anything:
             {
                 if ( arg == "-v" || arg == "--verbose" )
-                    opts.verbosity = verbosity::loud;
+                    verbosity = verbosity::loud;
                 else if ( arg == "-k" || arg == "-b" || arg == "--bound" )
                     state = state::expecting_bound;
                 else if ( arg == "-e" || arg == "--engine" )
                     state = state::expecting_engine;
                 else
                 {
-                    opts.input_file = arg;
+                    input_file = arg;
                     state = state::finished;
                 }
             } break;
@@ -69,6 +82,16 @@ std::expected< options, std::string > parse_cli( int argc, char** argv )
         return std::unexpected{ "expected an engine name" };
     if ( state == state::expecting_bound )
         return std::unexpected{ "expected a bound value" };
+    if ( !engine_name.has_value() )
+        return std::unexpected{ "no engine name given" };
+
+    auto opts = options
+    {
+        .input_file = input_file,
+        .engine_name = *engine_name,
+        .verbosity = verbosity,
+        .bound = bound
+    };
 
     return opts;
 }

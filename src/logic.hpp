@@ -234,7 +234,10 @@ public:
         res._literals.reserve( _literals.size() );
 
         for ( auto i = 0uz; i < _literals.size(); ++i )
-            res._literals[ i ] = f( _literals[ i ] );
+        {
+            const auto lit = _literals[ i ];
+            res._literals[ i ] = lit == literal::separator ? literal::separator : f( _literals[ i ] );
+        }
 
         return res;
     }

@@ -3,7 +3,6 @@
 #include <utility>
 #include <string>
 #include <vector>
-#include <map>
 #include <concepts>
 #include <iterator>
 #include <cassert>
@@ -100,8 +99,6 @@ public:
     [[nodiscard]] iterator end() const { return iterator{ _end }; }
 };
 
-using valuation = std::map< variable, bool >;
-
 class literal
 {
     int _value;
@@ -135,6 +132,8 @@ public:
 };
 
 inline literal literal::separator{ 0 };
+
+using valuation = std::vector< literal >;
 
 class variable_store
 {

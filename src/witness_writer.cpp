@@ -15,11 +15,8 @@ std::string row( const valuation& val )
 {
     auto res = std::string{};
 
-    // We assume that the order of iteration (i.e. with increasing ID) is the
-    // same as the order of the original variables in the Aiger.
-
-    for ( const auto& [ _, state ] : val )
-        res += state ? '1' : '0';
+    for ( const auto lit : val )
+        res += lit.sign() ? '1' : '0';
 
     res += "\n";
 
@@ -43,8 +40,8 @@ struct write_visitor
     {
         auto witness = std::format( "1\n{}\n", property );
 
-        if ( !cex.states().empty() )
-            witness += row( cex.states().front() );
+        assert( !cex.states().empty() );
+        witness += row( cex.states().front() );
 
         for ( const auto& in : cex.inputs() )
             witness += row( in );

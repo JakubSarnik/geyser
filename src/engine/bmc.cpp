@@ -99,11 +99,16 @@ counterexample bmc::build_counterexample( int step )
         auto& input = inputs[ i ];
         auto& state = states[ i ];
 
+        input.reserve( _system->input_vars().size() );
+        state.reserve( _system->state_vars().size() );
+
         for ( int vi = 0; vi < _system->input_vars().size(); ++vi )
-            input[ _system->input_vars().nth( vi ) ] = is_true( _versioned_input_vars[ i ].nth( vi ) );
+            input.emplace_back( _system->input_vars().nth( vi ),
+                                !is_true( _versioned_input_vars[ i ].nth( vi ) ) );
 
         for ( int vi = 0; vi < _system->state_vars().size(); ++vi )
-            state[ _system->state_vars().nth( vi ) ] = is_true( _versioned_state_vars[ i ].nth( vi ) );
+            state.emplace_back( _system->state_vars().nth( vi ),
+                                !is_true( _versioned_state_vars[ i ].nth( vi ) ) );
     }
 
     return counterexample{ std::move( inputs ), std::move( states ) };

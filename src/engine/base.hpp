@@ -18,6 +18,9 @@ struct unknown
     std::string reason;
 };
 
+// TODO: Do we need to store all the states here, or only the initial state?
+//       The initial is enough for witnesses according to the AIGER witness
+//       spec.
 class counterexample
 {
     // Maps steps to inputs, i.e. valuations of input variables.

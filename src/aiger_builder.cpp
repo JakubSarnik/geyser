@@ -188,8 +188,8 @@ std::expected< context, std::string > make_context( variable_store& store, aiger
 {
     if ( aig.num_outputs + aig.num_bad != 1 )
         return std::unexpected( std::format( "The input AIG has to contain precisely"
-                                             "one output (aiger <1.9) or precisely one bad specification"
-                                             "(aiger 1.9). The input contains {} outputs and {} bad specifications",
+                                             " one output (aiger <1.9) or precisely one bad specification"
+                                             " (aiger 1.9). The input contains {} outputs and {} bad specifications",
                                              aig.num_outputs, aig.num_bad ));
 
     if ( aig.num_fairness > 0 || aig.num_justice > 0 )

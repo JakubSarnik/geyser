@@ -150,14 +150,27 @@ cnf_formula build_trans( context& ctx )
         const auto next = literal{ ctx.next_state_vars.nth( int( i ) ) };
         const auto result_aig_literal = ctx.aig->latches[ i ].next;
 
-        trans.add_cnf( clausify_subgraph( ctx, result_aig_literal ) );
+        if ( result_aig_literal == aiger_true )
+        {
+            // x' = true
+            trans.add_clause( next );
+        }
+        else if ( result_aig_literal == aiger_false )
+        {
+            // x' = false
+            trans.add_clause( !next );
+        }
+        else
+        {
+            trans.add_cnf( clausify_subgraph( ctx, result_aig_literal ) );
 
-        // x' = phi
-        // (x' is stored in next, phi is computed in result_aig_literal)
-        // ~> (x' -> phi) /\ (phi -> x')
-        // ~> (-x' \/ phi) /\ (-phi \/ x')
-        trans.add_clause( !next, from_aiger_lit( ctx, result_aig_literal ) );
-        trans.add_clause( !from_aiger_lit( ctx, result_aig_literal ), next );
+            // x' = phi
+            // (x' is stored in next, phi is computed in result_aig_literal)
+            // ~> (x' -> phi) /\ (phi -> x')
+            // ~> (-x' \/ phi) /\ (-phi \/ x')
+            trans.add_clause( !next, from_aiger_lit( ctx, result_aig_literal ) );
+            trans.add_clause( !from_aiger_lit( ctx, result_aig_literal ), next );
+        }
     }
 
     return trans;

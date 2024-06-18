@@ -357,3 +357,42 @@ TEST_CASE( "Formulas are mapped correctly" )
         REQUIRE( to_nums( f.map( inc ) ) == std::vector{ 2, 3, 3, 0, -3, 2, 4, 0, -4, 4, 0 } );
     }
 }
+
+TEST_CASE( "Formulas are activated correctly" )
+{
+    auto store = variable_store{};
+    auto f = cnf_formula{};
+
+    const auto a = literal{ store.make() };
+    const auto b = literal{ store.make() };
+    const auto c = literal{ store.make() };
+
+    f.add_clause( a, b, b );
+    f.add_clause( !b, a, c );
+    f.add_clause( !c, c );
+
+    REQUIRE( to_nums( f ) == std::vector{ 1, 2, 2, 0, -2, 1, 3, 0, -3, 3, 0 } );
+
+    const auto acc = store.make();
+    REQUIRE( acc.id() == 4 );
+
+    SECTION( "Without an empty clause" )
+    {
+        REQUIRE( to_nums( f.activate( acc ) ) == std::vector{ 1, 2, 2, -4, 0, -2, 1, 3, -4, 0, -3, 3, -4, 0 } );
+    }
+
+    SECTION( "With an empty clause" )
+    {
+        f.add_clause( {} );
+
+        REQUIRE( to_nums( f ) == std::vector{ 1, 2, 2, 0, -2, 1, 3, 0, -3, 3, 0, 0 } );
+        REQUIRE( to_nums( f.activate( acc ) ) == std::vector{ 1, 2, 2, -4, 0, -2, 1, 3, -4, 0, -3, 3, -4, 0, -4, 0 } );
+    }
+
+    SECTION( "Without any clauses" )
+    {
+        const auto empty = cnf_formula{};
+
+        REQUIRE( to_nums( empty.activate( acc ) ) == std::vector< int >{} );
+    }
+}

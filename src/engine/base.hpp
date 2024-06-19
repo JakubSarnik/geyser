@@ -48,7 +48,7 @@ protected:
     void trace( std::format_string<Args...> fmt, Args&&... args ) const
     {
         if ( _opts->verbosity == verbosity::loud )
-            std::println( fmt, std::forward< Args... >( args... ) );
+            std::println( fmt, std::forward< Args >( args )... );
     }
 
 public:

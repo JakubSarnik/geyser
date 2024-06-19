@@ -119,7 +119,7 @@ counterexample bmc::build_counterexample( int step )
 // for make_trans( i ) where 0 <= i <= k + 1.
 const cnf_formula& bmc::make_trans( int step )
 {
-    trace( "Making a new transition formula for step {}", step );
+    trace( "Making a new transition formula for steps {} -> {}", step, step + 1 );
 
     assert( step >= 0 );
 

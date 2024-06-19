@@ -85,7 +85,7 @@ cnf_formula clausify_and( context& ctx, aiger_and conj )
     return res;
 }
 
-// Do a reverse traversal from the Aiger literal representing the result
+// Do a reverse traversal from the Aiger literals representing the results
 // through all the ANDs and ending with leaves consisting of state variables
 // and inputs.
 //
@@ -95,11 +95,9 @@ cnf_formula clausify_and( context& ctx, aiger_and conj )
 //
 // Notably, aiger literal's parity denotes whether it's positive (even)
 // or negative (odd).
-cnf_formula clausify_subgraph( context& ctx, aiger_literal root )
+cnf_formula clausify_subgraph( context& ctx, std::unordered_set< aiger_literal > required )
 {
     auto result = cnf_formula{};
-
-    auto required = std::unordered_set< aiger_literal >{ root };
 
     for ( auto i = int( ctx.aig->num_ands ) - 1; i >= 0; --i )
     {
@@ -137,39 +135,41 @@ cnf_formula build_init( context& ctx )
     return init;
 }
 
+// For each state variable x and its primed (next state) variant x', add
+// a conjunct x' = phi, where phi is the formula represented by the AIG
+// subgraph ending in the 'next' literal of the aiger literal for x.
 cnf_formula build_trans( context& ctx )
 {
-    // For each state variable x and its primed (next state) variant x', add
-    // a conjunct x' = phi, where phi is the formula represented by the AIG
-    // subgraph ending in the 'next' literal of the aiger literal for x.
+    auto roots = std::unordered_set< aiger_literal >{};
 
-    auto trans = cnf_formula{};
+    for ( auto i = 0u; i < ctx.aig->num_latches; ++i )
+    {
+        const auto next_aig_literal = ctx.aig->latches[ i ].next;
+
+        if ( !aiger_is_constant( next_aig_literal ) ) // NOLINT
+            roots.insert( next_aig_literal );
+    }
+
+    auto trans = clausify_subgraph( ctx, roots );
 
     for ( auto i = 0u; i < ctx.aig->num_latches; ++i )
     {
         const auto next = literal{ ctx.next_state_vars.nth( int( i ) ) };
-        const auto result_aig_literal = ctx.aig->latches[ i ].next;
+        const auto next_aig_literal = ctx.aig->latches[ i ].next;
 
-        if ( result_aig_literal == aiger_true )
-        {
-            // x' = true
+        if ( next_aig_literal == aiger_true ) // x' = true
             trans.add_clause( next );
-        }
-        else if ( result_aig_literal == aiger_false )
-        {
-            // x' = false
+        else if ( next_aig_literal == aiger_false ) // x' false
             trans.add_clause( !next );
-        }
         else
         {
-            trans.add_cnf( clausify_subgraph( ctx, result_aig_literal ) );
-
             // x' = phi
             // (x' is stored in next, phi is computed in result_aig_literal)
             // ~> (x' -> phi) /\ (phi -> x')
             // ~> (-x' \/ phi) /\ (-phi \/ x')
-            trans.add_clause( !next, from_aiger_lit( ctx, result_aig_literal ) );
-            trans.add_clause( !from_aiger_lit( ctx, result_aig_literal ), next );
+
+            trans.add_clause( !next, from_aiger_lit( ctx, next_aig_literal ) );
+            trans.add_clause( !from_aiger_lit( ctx, next_aig_literal ), next );
         }
     }
 
@@ -181,7 +181,7 @@ cnf_formula build_error( context& ctx )
     auto error = cnf_formula{};
     const auto error_literal = ( ctx.aig->num_outputs > 0 ? ctx.aig->outputs[ 0 ] : ctx.aig->bad[ 0 ] ).lit;
 
-    error.add_cnf( clausify_subgraph( ctx, error_literal ) );
+    error.add_cnf( clausify_subgraph( ctx, { error_literal } ) );
 
     // An error means that the error literal is true.
     error.add_clause( from_aiger_lit( ctx, error_literal ) );

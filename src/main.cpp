@@ -39,7 +39,7 @@ int main( int argc, char** argv )
     const auto trace = [ & ]( const std::string& s )
     {
         if ( opts->verbosity == verbosity::loud )
-            std::cout << s;
+            std::cout << s << std::flush;
     };
 
     auto aig = make_aiger();
@@ -72,6 +72,7 @@ int main( int argc, char** argv )
     }
 
     trace( "OK\n" );
+    trace( "Building the transition system... " );
 
     auto system = builder::build_from_aiger( store, *aig );
 
@@ -81,6 +82,7 @@ int main( int argc, char** argv )
         return 1;
     }
 
+    trace( "OK\n" );
     trace( "Running...\n\n" );
 
     const auto res = engine->run( *system );

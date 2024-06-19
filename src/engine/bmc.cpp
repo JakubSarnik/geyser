@@ -18,7 +18,7 @@ result bmc::run( const transition_system& system )
 
     setup_versioning();
 
-    for ( auto i = 0; i < bound; ++i )
+    for ( auto i = 0; i <= bound; ++i )
     {
         if ( i % solver_refresh_rate == 0 )
             refresh_solver( i );

@@ -40,8 +40,7 @@ struct write_visitor
     {
         auto witness = std::format( "1\n{}\n", property );
 
-        assert( !cex.states().empty() );
-        witness += row( cex.states().front() );
+        witness += row( cex.initial_state() );
 
         for ( const auto& in : cex.inputs() )
             witness += row( in );

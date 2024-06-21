@@ -18,22 +18,17 @@ struct unknown
     std::string reason;
 };
 
-// TODO: Do we need to store all the states here, or only the initial state?
-//       The initial is enough for witnesses according to the AIGER witness
-//       spec.
 class counterexample
 {
-    // Maps steps to inputs, i.e. valuations of input variables.
-    std::vector< valuation > _inputs;
-    // Maps steps to states, i.e. valuations of state variables.
-    std::vector< valuation > _states;
+    valuation _initial_state;
+    std::vector< valuation > _inputs; // Maps steps to inputs, i.e. valuations of input variables.
 
 public:
-    explicit counterexample( std::vector< valuation > inputs, std::vector< valuation > states )
-        : _inputs{ std::move( inputs ) }, _states{ std::move( states ) } {}
+    counterexample( valuation initial_state, std::vector< valuation > inputs )
+        : _initial_state{ std::move( initial_state ) }, _inputs{ std::move( inputs ) } {}
 
+    [[nodiscard]] const valuation& initial_state() const { return _initial_state; }
     [[nodiscard]] const std::vector< valuation >& inputs() const { return _inputs; }
-    [[nodiscard]] const std::vector< valuation >& states() const { return _states; }
 };
 
 using result = std::variant< ok, unknown, counterexample >;

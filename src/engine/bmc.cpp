@@ -88,30 +88,30 @@ counterexample bmc::build_counterexample( int step )
     trace( "Found a counterexample at step {}", step );
 
     assert( step >= 0 );
-    assert( step <= _versioned_state_vars.size() );
+    assert( !_versioned_state_vars.empty() );
     assert( step <= _versioned_input_vars.size() );
 
+    auto initial_state = valuation{};
+    initial_state.reserve( _system->state_vars().size() );
+
+    for ( int vi = 0; vi < _system->state_vars().size(); ++vi )
+        initial_state.emplace_back( _system->state_vars().nth( vi ),
+                            !is_true( _versioned_state_vars[ 0 ].nth( vi ) ) );
+
     auto inputs = std::vector< valuation >( step + 1 );
-    auto states = std::vector< valuation >( step + 1 );
 
     for ( int i = 0; i <= step; ++i )
     {
         auto& input = inputs[ i ];
-        auto& state = states[ i ];
 
         input.reserve( _system->input_vars().size() );
-        state.reserve( _system->state_vars().size() );
 
         for ( int vi = 0; vi < _system->input_vars().size(); ++vi )
             input.emplace_back( _system->input_vars().nth( vi ),
                                 !is_true( _versioned_input_vars[ i ].nth( vi ) ) );
-
-        for ( int vi = 0; vi < _system->state_vars().size(); ++vi )
-            state.emplace_back( _system->state_vars().nth( vi ),
-                                !is_true( _versioned_state_vars[ i ].nth( vi ) ) );
     }
 
-    return counterexample{ std::move( inputs ), std::move( states ) };
+    return counterexample{ std::move( initial_state ), std::move( inputs ) };
 }
 
 // Make the formula Trans(X_{step}, Y_{step}, X_{step + 1}).
@@ -178,9 +178,11 @@ const cnf_formula& bmc::make_trans( int step )
 cnf_formula bmc::make_error( int step )
 {
     assert( step >= 0 );
+    assert( step < _versioned_input_vars.size() );
     assert( step < _versioned_state_vars.size() );
     assert( step < _versioned_aux_vars.size() );
 
+    const auto ins = _versioned_input_vars[ step ];
     const auto here = _versioned_state_vars[ step ];
     const auto aux = _versioned_aux_vars[ step ];
     const auto activator = _store->make( std::format( "activator[{}]", step ) );
@@ -194,6 +196,8 @@ cnf_formula bmc::make_error( int step )
 
         switch ( type )
         {
+            case var_type::input:
+                return lit.substitute( ins.nth( pos ) );
             case var_type::state:
                 return lit.substitute( here.nth( pos ) );
             case var_type::auxiliary:

@@ -85,7 +85,7 @@ std::optional< counterexample > bmc::check_for( int step )
 
 counterexample bmc::build_counterexample( int step )
 {
-    trace( "Found a counterexample at step {}, building", step );
+    trace( "Found a counterexample at step {}", step );
 
     assert( step >= 0 );
     assert( step <= _versioned_state_vars.size() );
@@ -119,8 +119,6 @@ counterexample bmc::build_counterexample( int step )
 // for make_trans( i ) where 0 <= i <= k + 1.
 const cnf_formula& bmc::make_trans( int step )
 {
-    trace( "Making a new transition formula for steps {} -> {}", step, step + 1 );
-
     assert( step >= 0 );
 
     if ( step < _versioned_trans.size() )
@@ -179,8 +177,6 @@ const cnf_formula& bmc::make_trans( int step )
 // bounds.
 cnf_formula bmc::make_error( int step )
 {
-    trace( "Making the error formula for step {}", step );
-
     assert( step >= 0 );
     assert( step < _versioned_state_vars.size() );
     assert( step < _versioned_aux_vars.size() );

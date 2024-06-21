@@ -3,6 +3,7 @@
 #include "logic.hpp"
 #include <cassert>
 #include <utility>
+#include <exception>
 
 namespace geyser
 {
@@ -66,7 +67,7 @@ public:
         if ( _aux_vars.contains( var ) )
             return { var_type::auxiliary, _aux_vars.offset( var ) };
 
-        assert( false ); // Unreachable
+        std::terminate(); // Unreachable
     }
 };
 

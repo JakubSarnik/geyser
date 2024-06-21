@@ -6,6 +6,7 @@
 #include <utility>
 #include <string>
 #include <expected>
+#include <exception>
 
 namespace geyser::builder
 {
@@ -37,7 +38,7 @@ inline literal from_aiger_lit( context& ctx, aiger_literal lit )
         if ( const auto *ptr = aiger_is_and( ctx.aig, var ); ptr )
             return ctx.and_vars.nth( int( ptr - ctx.aig->ands ) );
 
-        assert( false ); // Unreachable
+        std::terminate(); // Unreachable
     };
 
     return literal

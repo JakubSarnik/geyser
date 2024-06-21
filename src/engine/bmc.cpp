@@ -1,6 +1,7 @@
 #include "bmc.hpp"
 #include <limits>
 #include <format>
+#include <exception>
 
 namespace geyser
 {
@@ -205,7 +206,7 @@ cnf_formula bmc::make_error( int step )
             default:
                 trace( "An unexpected variable ({}) has occurred in the base error formula",
                        std::to_underlying( type ) );
-                assert( false );
+                std::terminate(); // Unreachable
         }
     }).activate( activator );
 }

@@ -1,5 +1,4 @@
 #include "aiger_builder.hpp"
-
 #include <format>
 #include <unordered_set>
 
@@ -178,11 +177,14 @@ cnf_formula build_trans( context& ctx )
 
 cnf_formula build_error( context& ctx )
 {
-    auto error = cnf_formula{};
     const auto error_literal = ( ctx.aig->num_outputs > 0 ? ctx.aig->outputs[ 0 ] : ctx.aig->bad[ 0 ] ).lit;
 
-    error.add_cnf( clausify_subgraph( ctx, { error_literal } ) );
+    if ( error_literal == aiger_true )
+        return cnf_formula::constant( true );
+    if ( error_literal == aiger_false )
+        return cnf_formula::constant( false );
 
+    auto error = clausify_subgraph( ctx, { error_literal } );
     // An error means that the error literal is true.
     error.add_clause( from_aiger_lit( ctx, error_literal ) );
 

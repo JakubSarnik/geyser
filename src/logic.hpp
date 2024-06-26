@@ -198,6 +198,17 @@ class cnf_formula
     std::vector< literal > _literals;
 
 public:
+    static cnf_formula constant( bool value )
+    {
+        if ( value )
+            return cnf_formula{};
+
+        auto contradiction = cnf_formula{};
+        contradiction.add_clause( {} );
+
+        return contradiction;
+    }
+
     void add_clause( const std::vector< literal >& clause )
     {
         _literals.reserve( _literals.size() + clause.size() + 1 );

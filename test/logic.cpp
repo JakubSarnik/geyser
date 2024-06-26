@@ -396,3 +396,16 @@ TEST_CASE( "Formulas are activated correctly" )
         REQUIRE( to_nums( empty.activate( acc ) ) == std::vector< int >{} );
     }
 }
+
+TEST_CASE( "Constant formulas are constant" )
+{
+    SECTION( "Tautology" )
+    {
+        REQUIRE( to_nums( cnf_formula::constant( true ) ) == std::vector< int >{} );
+    }
+
+    SECTION( "Contradiction" )
+    {
+        REQUIRE( to_nums( cnf_formula::constant( false ) ) == std::vector< int >{ 0 } );
+    }
+}

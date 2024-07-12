@@ -6,7 +6,7 @@ Given a transition system S = <X, Y, I(X), T(X, Y, X')> and an error formula
 E(X, Y) [describing that input Y in state X is bad; note that the error formula
 might depend on Y in Aiger], we store a trace
 
-  F_0, F_1, ..., F_k, F_inf,
+  F_0, F_1, ..., F_k
 
 where each F_i is a set of cubes blocked at step i, but not at step i + 1. Note
 that we can reconstruct the original meaning of the trace
@@ -15,38 +15,60 @@ that we can reconstruct the original meaning of the trace
 
 in IC3 by
 
-  R_i = -F_i /\ -F_{i + 1} /\ ... /\ -F_k /\ -F_inf
+  R_i = -F_i /\ -F_{i + 1} /\ ... /\ -F_k
   (and R_0 = I).
 
-Following Een et al., F_inf is a special set which contains those cubes that
-have been proven unreachable in any number of steps. The trace is implemented
-as a vector storing F_0, ..., F_inf in order.
+The trace is implemented as a vector storing F_0, ..., F_k in order. We also
+store activation variables for each frame in vector Act, and the solver is
+informed about the contents of the frames as follows: Whenever we add a new
+cube c to F_i, the clause -c_j (-c activated by Act_j) is added to the solver
+for each 1 <= j <= i (we don't add it to F_0, although that shouldn't break
+anything).
+
+In order to do everything using a single solver, we also need to variously
+activate or deactivate formulas T and E. Thus, we also have activation
+variables ActT and ActE. The solver is initially loaded by both formulas
+activated by their respective variables.
 
 The pseudocode is as follows:
 
 pdr() -> result:
-  F.push_back() # Create (empty) F_inf at the back of F
-  push_frame() # Create (empty) F_0 at the start of F (i.e. F = [F_0, F_inf])
+  # Fill the solver by the most important parts of the transition system
+  # description.
 
-  # Note that k is |F| - 1
+  assert_formula( T.activated_by( ActT ) )
+  assert_formula( E.activated_by( ActE ) )
+
+  push_frame() # Create (empty) F_0 at the start of F (i.e. F = [F_0]).
+
+  # The first frame is special, it is exactly the formula I.
+
+  for c in clauses(I):
+    F[ 0 ].add_clause( c.activated_by( Act[ 0 ] ) )
+
+  # Note that k is |F| - 1.
 
   loop:
-    while SAT( R[k] /\ E ):
+    # This implements SAT( R[ k ] /\ E ) query.
+    while sat_assuming( Act[ k ], ActE ):
+
+      # Read all (non-primed) state variables from the solver.
       s = model( R[k] /\ E )
 
       if solve_obligation( < s, k > ) == counterexample:
-        # This needs to be done with some additional bookkeeping, like storing
-        # predecessor inputs in proof obligations as well?
+        # This needs to be done with some additional bookkeeping...
+        # (see the state pool in IC3ref).
+
         return counterexample
 
-    push_frame() # Create (empty) F_{k + 1}
+    push_frame() # Create (empty) F_{k + 1}.
 
     if propagate() == invariant_found:
       return ok
 
 
 solve_obligation( < s, k > : cube * int ) -> result:
-  # Minimum priority queue of proof obligations, ordered by frame
+  # Minimum priority queue of proof obligations, ordered by frame.
   Q = minimum_queue()
   Q.add( < s, k > )
 
@@ -56,47 +78,60 @@ solve_obligation( < s, k > : cube * int ) -> result:
     if i == 0:
       return counterexample # We have backtraced to an initial state!
 
-    # If we have already seen this cube, do not return to it
+    # If we have already seen this cube, do not return to it.
     if is_already_blocked( < c, i > ):
       continue
 
     # Note that at this point, c is guaranteed not to intersect with the
-    # initial states
+    # initial states.
 
-    if SAT( R[ i - 1 ] /\ -c /\ T /\ c' ):
-      # c has a predecessor d in R[ i - 1 ]
+    # This implements SAT( R[ i - 1 ] /\ -c /\ T /\ c' ) query. Note that
+    # constrain adds the clause -c (but only a single clause) into the SAT
+    # solvers' context with the same lifetime as activation literals (i.e.
+    # the clause will disappear once the query is finished). This API is
+    # provided by CaDiCaL.
+
+    constrain( -c )
+    if sat_assuming( Act[ i - 1 ], ActT, literals( c' ) ):
+
+      # c has a predecessor d in R[ i - 1 ], implement by reading all the
+      # non-primed state variables from the solver.
+
       d = model( R[ i - 1 ] /\ -c /\ T /\ c' )
 
-      # Generalize a full model to a shorter cube
+      # Generalize a full model to a shorter cube.
       e = generalize_predecessor( d )
 
-      # Focus now on blocking e one step closer to the initial states
+      # Focus now on blocking e one step closer to the initial states.
       Q.add( < e, i - 1 > )
 
-      # After that is done, return back to c, try a different predecessor
+      # After that is done, return back to c, try a different predecessor.
       Q.add( < c, i > )
 
     else:
       # There is no predecessor in R[ i - 1 ] of any state in c
-      # Generalize cube c to block more states
+      # Generalize cube c to block more states.
+
       < d, j > = generalize_inductive( c, i )
 
       # Note that Een et al.'s generalization is quite a bit more involved
       # here, and we need to access the unsat core of the SAT call.
-      # TODO: Investigate this more and how it interacts with F_inf.
-      #       Do we even want F_inf?
 
       add_blocked_at( d, j )
 
       # This is not necessary according to Een et al., but it apparently
       # improves performance.
       # TODO: Investigate
+
       if i < k && j != inf:
         Q.add( < c, j > )
 
 
 push_frame():
-  TODO
+  assert |F| = |Act|
+
+  F.push_back()
+  Act.push_back( make_variable() )
 
 
 propagate():
@@ -114,6 +149,7 @@ add_blocked_at( c : cube, i : int ):
 # We found that c is a predecessor state (i.e. a full cube) of some other cube.
 # Generalize (e.g. using ternary simulation or a SAT based approach) to a
 # smaller cube.
+
 generalize_predecessor( s : cube ) -> cube:
   TODO
 
@@ -122,6 +158,5 @@ generalize_inductive( s : cube, i : int ) -> cube:
   TODO
 
 
-TODO: Also investigate how to best interact with the solver. Activation
-      literals for each frame? Relative induction using constrain clauses?
-      When to reset?...
+TODO: When to reset the solver? Probably the only reason to reset the solver
+      is to remove subsumed clauses...

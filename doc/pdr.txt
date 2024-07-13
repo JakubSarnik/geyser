@@ -21,9 +21,10 @@ in IC3 by
 The trace is implemented as a vector storing F_0, ..., F_k in order. We also
 store activation variables for each frame in vector Act, and the solver is
 informed about the contents of the frames as follows: Whenever we add a new
-cube c to F_i, the clause -c_j (-c activated by Act_j) is added to the solver
-for each 1 <= j <= i (we don't add it to F_0, although that shouldn't break
-anything).
+cube c to F_i, the clause -c_i (-c activated by Act_i) is added to the solver.
+Since solving under Act_i means we want to have all the clauses from i up to
+k active (i.e. Act_i activates R[ i ], not just F[ i ]), we add an implication
+Act_k -> Act_{k + 1} to the solver whenever we push a new frame F_k.
 
 In order to do everything using a single solver, we also need to variously
 activate or deactivate formulas T and E. Thus, we also have activation
@@ -33,20 +34,22 @@ activated by their respective variables.
 The pseudocode is as follows:
 
 pdr() -> result:
-  # Fill the solver by the most important parts of the transition system
-  # description.
+  # Create (empty) F_0 at the start of F (i.e. F = [F_0]). push_frame expects
+  # Act array to be one step in front so that Act forward implication can be
+  # added.
 
-  assert_formula( T.activated_by( ActT ) )
-  assert_formula( E.activated_by( ActE ) )
-
-  push_frame() # Create (empty) F_0 at the start of F (i.e. F = [F_0]).
-
-  # The first frame is special, it is exactly the formula I.
-
-  for c in clauses(I):
-    F[ 0 ].add_clause( c.activated_by( Act[ 0 ] ) )
+  Act.push_back( make_variable() )
+  push_frame()
 
   # Note that k is |F| - 1.
+
+  # Fill the solver by the transition system's CNF specification. Note that the
+  # first frame is handled separately - F[ 0 ] is kept empty and Act[ 0 ]
+  # activates the initial formula.
+
+  assert_formula( I.activated_by( Act[ 0 ] ) )
+  assert_formula( T.activated_by( ActT ) )
+  assert_formula( E.activated_by( ActE ) )
 
   loop:
     # This implements SAT( R[ k ] /\ E ) query.
@@ -67,10 +70,12 @@ pdr() -> result:
       return ok
 
 
-solve_obligation( < s, k > : cube * int ) -> result:
+solve_obligation( < s, k' > : cube * int ) -> result:
+  assert k' <= k
+
   # Minimum priority queue of proof obligations, ordered by frame.
   Q = minimum_queue()
-  Q.add( < s, k > )
+  Q.add( < s, k' > )
 
   while ( |Q| > 0 ):
     < c, i > = Q.pop_minimum()
@@ -128,29 +133,84 @@ solve_obligation( < s, k > : cube * int ) -> result:
 
 
 push_frame():
-  assert |F| = |Act|
+  assert |F| + 1 = |Act|
 
   F.push_back()
   Act.push_back( make_variable() )
 
+  assert |Act| = k + 1
+
+  # Add an implication guaranteeing that enabling frame F_i in the solver
+  # enables F_i, F_{i + 1}, ..., F_k.
+
+  assert_clause( -Act[ k ] \/ Act[ k + 1 ] )
+
 
 propagate():
-  TODO
+  for i in 1 .. ( k - 1 ):
+    # TODO: We want to call add_blocked_at, but this will change the latter
+    #       parts of the trace!
 
 
 is_already_blocked( < c, i > : cube * int ) -> bool:
-  TODO
+  assert i <= k
+
+  # We first check whether all the states in c have already been blocked in
+  # R[ i ] (that is, whether they have been blocked somewhere between F[ i ]
+  # and F[ k ]) by checking for a simple syntactic subsumption of the cubes...
+
+  for j in i .. k:
+    for d in F[ j ]:
+      if subsumes( d, c ):
+        return true
+
+  # ... only if this fails, we perform a more expensive SAT query
+  # SAT( R[ i ] /\ c ). This formula is satisfiable if and only if the cube
+  # c has non-empty intersection of states with R[ i ], i.e. when it hasn't
+  # been blocked yet.
+
+  return not sat_assuming( Act[ i ], literals( c ) )
 
 
 add_blocked_at( c : cube, i : int ):
-  TODO
+  assert i <= k
+
+  # First add the cube c to F[ i ]. However, our trace can at this point
+  # contain "strictly weaker information" which is easy to detect and remove:
+  # If we already have a cube d in some F[ j ] (j <= i) that is subsumed by c,
+  # there is no reason to keep it.
+
+  for j in 1 .. k:
+    for d in F[ j ]:
+      if subsumes( c, d ):
+        F[ j ].remove( d )
+
+  F[ i ].push_cube( c )
+
+  # Now add the cube also to the solver. We cannot remove the subsumed clauses
+  # in the solver, but we can reset the solver periodically (once every X SAT
+  # queries, Griggio et al. suggest about 5000 but in a slightly different
+  # setting -- they also want to get rid of unneeded activation literals).
+
+  assert_clause( ( -c ).activated_by( Act[ i ] ) )
 
 
-# We found that c is a predecessor state (i.e. a full cube) of some other cube.
-# Generalize (e.g. using ternary simulation or a SAT based approach) to a
-# smaller cube.
+subsumes( c : cube, d : cube ) : bool
+  # A simple and syntactic (thus very conservative) check whether c |= d. This
+  # holds iff all the literals in d are also in c with the same polarity.
+
+  for l in literals( d ):
+    if not literals( c ).contains( l ):
+      return false
+
+  return true
+
 
 generalize_predecessor( s : cube ) -> cube:
+  # We found that c is a predecessor state (i.e. a full cube) of some other cube.
+  # Generalize (e.g. using ternary simulation or a SAT based approach) to a
+  # smaller cube.
+
   TODO
 
 
@@ -158,5 +218,17 @@ generalize_inductive( s : cube, i : int ) -> cube:
   TODO
 
 
-TODO: When to reset the solver? Probably the only reason to reset the solver
-      is to remove subsumed clauses...
+
+TODO:
+  - How to efficiently represent cubes? If they are unsorted literal vectors,
+    subsumption check is necessarily quadratic. If they are sorted literal
+    vectors, subsumption can be checked in linear time, but cannot this
+    interact negatively with solver heuristics?
+  - How to efficiently represent sets of cubes? Investigate vectors vs rb-trees
+    vs hash tables.
+  - When to reset the solver? Our only reason is probably to remove subsumed
+    clauses, we do not recycle any activation literals.
+  - Isn't it a bit more efficient to manually activate Act[ i ] .. Act[ k ]
+    instead of adding all those Act[ i ] -> Act[ i + 1 ] implications?
+    Probably yes, but investigate (also this allows us to have |F| = |Act|),
+    so a bit less of ceremony.

@@ -22,9 +22,7 @@ The trace is implemented as a vector storing F_0, ..., F_k in order. We also
 store activation variables for each frame in vector Act, and the solver is
 informed about the contents of the frames as follows: Whenever we add a new
 cube c to F_i, the clause -c_i (-c activated by Act_i) is added to the solver.
-Since solving under Act_i means we want to have all the clauses from i up to
-k active (i.e. Act_i activates R[ i ], not just F[ i ]), we add an implication
-Act_k -> Act_{k + 1} to the solver whenever we push a new frame F_k.
+We can then solve with R_i activated by assuming literals Act_i through Act_k.
 
 In order to do everything using a single solver, we also need to variously
 activate or deactivate formulas T and E. Thus, we also have activation
@@ -34,11 +32,8 @@ activated by their respective variables.
 The pseudocode is as follows:
 
 pdr() -> result:
-  # Create (empty) F_0 at the start of F (i.e. F = [F_0]). push_frame expects
-  # Act array to be one step in front so that Act forward implication can be
-  # added.
 
-  Act.push_back( make_variable() )
+  # Create (empty) F_0 at the start of F (i.e. F = [F_0]).
   push_frame()
 
   # Note that k is |F| - 1.
@@ -47,16 +42,15 @@ pdr() -> result:
   # first frame is handled separately - F[ 0 ] is kept empty and Act[ 0 ]
   # activates the initial formula.
 
-  assert_formula( I.activated_by( Act[ 0 ] ) )
-  assert_formula( T.activated_by( ActT ) )
-  assert_formula( E.activated_by( ActE ) )
+  sat_add_formula( I.activated_by( Act[ 0 ] ) )
+  sat_add_formula( T.activated_by( ActT ) )
+  sat_add_formula( E.activated_by( ActE ) )
 
   loop:
-    # This implements SAT( R[ k ] /\ E ) query.
-    while sat_assuming( Act[ k ], ActE ):
 
-      # Read all (non-primed) state variables from the solver.
-      s = model( R[k] /\ E )
+    # This implements SAT( R[ k ] /\ E ) query.
+    while is_sat_assuming( Act[ k ], ActE ):
+      s = sat_get_model().filter( is_state_variable )
 
       if solve_obligation( < s, k > ) == counterexample:
         # This needs to be done with some additional bookkeeping...
@@ -91,18 +85,16 @@ solve_obligation( < s, k' > : cube * int ) -> result:
     # initial states.
 
     # This implements SAT( R[ i - 1 ] /\ -c /\ T /\ c' ) query. Note that
-    # constrain adds the clause -c (but only a single clause) into the SAT
-    # solvers' context with the same lifetime as activation literals (i.e.
-    # the clause will disappear once the query is finished). This API is
-    # provided by CaDiCaL.
+    # sat_constrain adds the clause -c (but only a single clause) into the SAT
+    # solver's context with the same lifetime as assumed literals (i.e. the
+    # clause will disappear once the query is finished). This API is provided
+    # by CaDiCaL.
 
-    constrain( -c )
-    if sat_assuming( Act[ i - 1 ], ActT, literals( c' ) ):
+    sat_constrain( -c )
+    if is_sat_assuming( ActT, literals( c' ), Act[ i - 1 ], ..., Act[ k ] ):
 
-      # c has a predecessor d in R[ i - 1 ], implement by reading all the
-      # non-primed state variables from the solver.
-
-      d = model( R[ i - 1 ] /\ -c /\ T /\ c' )
+      # c has a predecessor d in R[ i - 1 ]
+      d = sat_get_model().filter( is_state_variable )
 
       # Generalize a full model to a shorter cube.
       e = generalize_predecessor( d )
@@ -133,23 +125,42 @@ solve_obligation( < s, k' > : cube * int ) -> result:
 
 
 push_frame():
-  assert |F| + 1 = |Act|
+  assert |F| = |Act|
 
   F.push_back()
   Act.push_back( make_variable() )
 
-  assert |Act| = k + 1
 
-  # Add an implication guaranteeing that enabling frame F_i in the solver
-  # enables F_i, F_{i + 1}, ..., F_k.
-
-  assert_clause( -Act[ k ] \/ Act[ k + 1 ] )
-
-
-propagate():
+propagate() -> propagate_result:
   for i in 1 .. ( k - 1 ):
-    # TODO: We want to call add_blocked_at, but this will change the latter
-    #       parts of the trace!
+    for c in F[ i ]:
+
+      # We push a blocked cube c from F[ i ] to F[ i + 1 ] if it is still
+      # blocked in that frame, i.e. if SAT( R[ i ] /\ -c /\ T /\ c' )
+      # is false. However, we actually know that c is already blocked
+      # at i (i.e. the clause -c will be activated by Act[ i ]), so we only
+      # have to ask whether SAT( R[ i ] /\ T /\ c' ) is false.
+
+      if not is_sat_assuming( ActT, literals( c' ), Act[ i ], ..., Act[ k ] ):
+
+        # Beware here that add_blocked_at will actually remove the clause c
+        # from F[ i ] as subsumed (by itself). Depending on implementation,
+        # this can, e.g., reorder F[ i ] or do all sort of things with it,
+        # and the implementation of iteration through F[ i ] must react to
+        # this.
+
+        add_blocked_at( c, i + 1 )
+
+    # After propagating the cubes from F[ i ], it might happen that all the
+    # cubes that held in F[ i ] also hold in F[ i + 1 ], i.e. every cube
+    # in F[ i ] was added to F[ i + 1 ] and by subsumption removed from F[ i ],
+    # leaving F[ i ] empty. This indicates that R[ i ] = R[ i + 1 ], i.e. we
+    # have found our inductive invariant.
+
+    if |F[ i ]| = 0:
+      return invariant_found
+
+  return invariant_not_found
 
 
 is_already_blocked( < c, i > : cube * int ) -> bool:
@@ -169,7 +180,7 @@ is_already_blocked( < c, i > : cube * int ) -> bool:
   # c has non-empty intersection of states with R[ i ], i.e. when it hasn't
   # been blocked yet.
 
-  return not sat_assuming( Act[ i ], literals( c ) )
+  return not is_sat_assuming( literals( c ), Act[ i ], ..., Act[ k ] )
 
 
 add_blocked_at( c : cube, i : int ):
@@ -192,12 +203,16 @@ add_blocked_at( c : cube, i : int ):
   # queries, Griggio et al. suggest about 5000 but in a slightly different
   # setting -- they also want to get rid of unneeded activation literals).
 
-  assert_clause( ( -c ).activated_by( Act[ i ] ) )
+  sat_add_clause( ( -c ).activated_by( Act[ i ] ) )
 
 
 subsumes( c : cube, d : cube ) : bool
   # A simple and syntactic (thus very conservative) check whether c |= d. This
-  # holds iff all the literals in d are also in c with the same polarity.
+  # holds iff all the literals in d are also in c with the same polarity. We
+  # know this can't happen if d is actually larger than c.
+
+  if |literals( d )| > |literals( c )|:
+    return false
 
   for l in literals( d ):
     if not literals( c ).contains( l ):
@@ -228,7 +243,3 @@ TODO:
     vs hash tables.
   - When to reset the solver? Our only reason is probably to remove subsumed
     clauses, we do not recycle any activation literals.
-  - Isn't it a bit more efficient to manually activate Act[ i ] .. Act[ k ]
-    instead of adding all those Act[ i ] -> Act[ i + 1 ] implications?
-    Probably yes, but investigate (also this allows us to have |F| = |Act|),
-    so a bit less of ceremony.

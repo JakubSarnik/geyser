@@ -1,6 +1,12 @@
-We base our implementation mainly on Efficient Implementation of Property
-Directed Reachability (Een, Mischenko, Brayton) and Comparing Different
-Variants of the IC3 Algorithm for Hardware Model Checking (Griggio, Roveri).
+We base our implementation mainly on Efficient implementation of property
+directed reachability (Een, Mischenko, Brayton) and Comparing different
+variants of the IC3 algorithm for hardware model checking (Griggio, Roveri).
+We have also taken a look at the source code of IC3Ref (Bradley), although our
+overall design is much closer to Een et al. than to Bradley. Note that the
+method of generalizing predecessors was taken from Incremental formal
+verification of hardware (Chockler et al.), and the approach to inductive
+generalization of blocked cubes from Better generalization in ic3 (Hassan,
+Bradley, Somenzi).
 
 Given a transition system S = <X, Y, I(X), T(X, Y, X')> and an error formula
 E(X, Y) [describing that input Y in state X is bad; note that the error formula
@@ -207,6 +213,7 @@ add_blocked_at( c : cube, i : int ):
 
 
 subsumes( c : cube, d : cube ) : bool
+
   # A simple and syntactic (thus very conservative) check whether c |= d. This
   # holds iff all the literals in d are also in c with the same polarity. We
   # know this can't happen if d is actually larger than c.
@@ -222,11 +229,49 @@ subsumes( c : cube, d : cube ) : bool
 
 
 generalize_predecessor( s : cube ) -> cube:
-  # We found that c is a predecessor state (i.e. a full cube) of some other cube.
-  # Generalize (e.g. using ternary simulation or a SAT based approach) to a
-  # smaller cube.
+  assert s.all( fun lit => var( lit ).is_state_variable )
 
-  TODO
+  # We found that s is a cube satisfying R[ i - 1 ] /\ -s /\ T /\ s' for some
+  # i, now we want to get a predecessor cube d to s. While just fetching all
+  # the state variables from the model of the formula above would give us a
+  # cube representing precisely one predecessor d in R[ i - 1 ], we want to
+  # generalize to more than a single state by returning a cube that does not
+  # contain all state variables.
+
+  # Note that this function must be called before a different sat call is made.
+  ins = sat_get_model().filter( is_input_variable )
+  p = sat_get_model().filter( is_state_variable )
+
+  loop:
+
+    # Query SAT( T /\ ins /\ p /\ -s' ). We know this is unsatisfiable, since
+    # ins /\ p gives us exactly the transition from the predecessor of s found
+    # by the SAT query performed before calling this function. This property
+    # is then maintained by the loop.
+
+    sat_constrain( -s' )
+    b = is_sat_assuming( ActT, ins, p )
+
+    assert not b
+
+    s = sat_get_core().filter( fun lit => p.contains( lit ) )
+
+    # We asked for all the literals in p that were needed to determine that
+    # T /\ ins /\ p /\ -s' is not satisfiable. If they were all needed, we
+    # cannot shrink p any further. Otherwise, throw away all those that weren't
+    # necessary and check SAT( T /\ ins /\ p /\ -s' ) again in a new iteration.
+    # Note that by this must still be unsatisfiable (we have, after all, left
+    # in all the p literals that were used in the very proof of that), which
+    # guarantees the invariant mentioned above.
+
+    # Additionally, this loop must ultimately finish by returning p, since in
+    # every iteration, we either shrink p by at least one literal, or not
+    # shrink it and stop.
+
+    if s == p:
+      return p
+    else:
+      p = s
 
 
 generalize_inductive( s : cube, i : int ) -> cube:

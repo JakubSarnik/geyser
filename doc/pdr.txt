@@ -35,7 +35,12 @@ activate or deactivate formulas T and E. Thus, we also have activation
 variables ActT and ActE. The solver is initially loaded by both formulas
 activated by their respective variables.
 
-The pseudocode is as follows:
+The pseudocode is given below. Note several conventions:
+  - |X| is the size of the collection X
+  - for a given formula f, f' is f.map( fun lit => lit.prime() )
+  - -f is the negation of f
+  - etc.
+
 
 pdr() -> result:
 
@@ -71,10 +76,10 @@ pdr() -> result:
 
 
 solve_obligation( < s, k' > : cube * int ) -> result:
-  assert k' <= k
+  assert 0 <= k' <= k
 
   # Minimum priority queue of proof obligations, ordered by frame.
-  Q = minimum_queue()
+  Q = minimum_queue[ cube * int ]()
   Q.add( < s, k' > )
 
   while ( |Q| > 0 ):
@@ -99,14 +104,12 @@ solve_obligation( < s, k' > : cube * int ) -> result:
     sat_constrain( -c )
     if is_sat_assuming( ActT, literals( c' ), Act[ i - 1 ], ..., Act[ k ] ):
 
-      # c has a predecessor d in R[ i - 1 ]
-      d = sat_get_model().filter( is_state_variable )
+      # c has a predecessor d in R[ i - 1 ], generalize a full cube of d to
+      # a shorter cube.
+      d = generalized_predecessor( c )
 
-      # Generalize a full model to a shorter cube.
-      e = generalize_predecessor( d )
-
-      # Focus now on blocking e one step closer to the initial states.
-      Q.add( < e, i - 1 > )
+      # Focus now on blocking d one step closer to the initial states.
+      Q.add( < d, i - 1 > )
 
       # After that is done, return back to c, try a different predecessor.
       Q.add( < c, i > )
@@ -115,6 +118,7 @@ solve_obligation( < s, k' > : cube * int ) -> result:
       # There is no predecessor in R[ i - 1 ] of any state in c
       # Generalize cube c to block more states.
 
+      # TODO: Not generalize_inductive( c, i - 1 )???
       < d, j > = generalize_inductive( c, i )
 
       # Note that Een et al.'s generalization is quite a bit more involved
@@ -170,7 +174,7 @@ propagate() -> propagate_result:
 
 
 is_already_blocked( < c, i > : cube * int ) -> bool:
-  assert i <= k
+  assert 1 <= i <= k
 
   # We first check whether all the states in c have already been blocked in
   # R[ i ] (that is, whether they have been blocked somewhere between F[ i ]
@@ -190,7 +194,7 @@ is_already_blocked( < c, i > : cube * int ) -> bool:
 
 
 add_blocked_at( c : cube, i : int ):
-  assert i <= k
+  assert 1 <= i <= k
 
   # First add the cube c to F[ i ]. However, our trace can at this point
   # contain "strictly weaker information" which is easy to detect and remove:
@@ -228,7 +232,7 @@ subsumes( c : cube, d : cube ) : bool
   return true
 
 
-generalize_predecessor( s : cube ) -> cube:
+generalized_predecessor( s : cube ) -> cube:
   assert s.all( fun lit => var( lit ).is_state_variable )
 
   # We found that s is a cube satisfying R[ i - 1 ] /\ -s /\ T /\ s' for some
@@ -274,9 +278,122 @@ generalize_predecessor( s : cube ) -> cube:
       p = s
 
 
-generalize_inductive( s : cube, i : int ) -> cube:
-  TODO
+generalize_inductive( c : cube, i : int ) -> cube:
+  assert 1 <= i <= k
 
+  # Clause -c has been found to be inductive relative to R[ i - 1 ], i.e. the
+  # formula R[ i - 1 ] /\ -c /\ T /\ c' was found to be unsatisfiable in
+  # solve_obligation (that is, there is no predecessor state of any state in c
+  # in the frame R[ i - 1 ]). (Note that the inductivity comes from the fact
+  # that the formula is unsatisfiable iff R[ i - 1 ] /\ -c /\ T |= -c' holds.)
+  # We could now just add -c to F[ i ], but we want to generalize the clause
+  # to contain more states by dropping some literals from it.
+
+  return -generalize_clause( -c, i, 1 )
+
+
+generalize_clause( c : clause, i : int, level : int ) -> clause:
+  required = set[ literal ]()
+
+  for l in literals( c ):
+    d = c.filter( fun lit => lit /= l )
+    success, d = down( d, i, level, required )
+
+    if success:
+      c = d
+    else:
+      required.insert( l )
+
+  return c
+
+
+down( c : clause, i : int, level : int, req : set[ literal ] )
+  -> bool * clause:
+
+  assert 0 <= i <= k
+
+  # We use two heuristically chosen configuration parameters in this function:
+  # - max_ctgs
+  # - max_level
+  # Bradley suggests using values max_ctgs = 3, max_level = 1.
+
+  ctgs = 0
+
+  loop:
+    # SAT( I /\ -c )? If so, our c intersects the initial states and as such
+    # cannot be (relatively) inductive anymore.
+
+    if is_sat_assuming( Act[ 0 ], literals( -c ) ):
+      return false, c
+
+    # SAT( R[ i ] /\ c /\ T /\ -c' )? If not, c is inductive relative to R[ i ].
+
+    sat_constrain( c )
+    if not is_sat_assuming( ActT, literals( -c' ), Act[ i ], ..., Act[ k ] ):
+      d = clause( sat_get_core()
+                  .filter( fun lit => is_primed_variable( var( lit ) ) )
+                  .map( unprime ) )
+
+      # Add literals until we have a guarantee that clause d doesn't intersect
+      # the initial states.
+
+      sat_constrain( d )
+      while is_sat_assuming( Act[ 0 ] ):
+
+        # Griggio has here simply "pick any literal"
+        l = literals( c ).set_minus( literals( d ) ).first()
+        d.insert( d )
+
+        sat_constrain( d )
+
+      return true, d
+
+    # We don't want to spend too much time on addressing CTGs (which happens
+    # when this function is called recursively, see below).
+
+    if level > max_level:
+      return false, c
+
+    # Here we know that c is not inductive relative to R[ i ], i.e. it has
+    # a predecessor in R[ i ].
+
+    s = generalized_predecessor( -c )
+
+    # SAT( I /\ s )?
+    q1 = is_sat_assuming( Act[ 0 ], literals( s ) )
+
+    # SAT( R[ i - 1 ] /\ -s /\ T /\ s' )
+    sat_constrain( -s )
+    q2 = is_sat_assuming( ActT, literals( s' ), Act[ i - 1 ], ... Act[ k ] )
+
+    # Note that if both q1 and q2 are false, the predecessor s is inductive
+    # relative to R[ i - 1 ].
+
+    if ctgs < max_ctgs and i > 0 and not q1 and not q2:
+      ctgs = ctgs + 1
+      j = i
+
+      # While we don't have s inductive relative to F[ j ]...
+      # (i.e. while not SAT( R[ j ] /\ -s /\ T /\ s' ))
+
+      sat_constrain( -s )
+      while not is_sat_assuming( ActT, literals( s' ), Act[ j ], ..., Act[ k ] ):
+        assert j <= k
+
+        j = j + 1
+        sat_constrain( -s )
+
+      _, d = generalise_clause( -s, j - 1, level + 1 )
+      add_blocked_at( -d, j )
+
+    else:
+      ctgs = 0
+      sz = |( literals( c ).set_minus( literals( -s ) ) ).set_intersect( req )|
+
+      if sz > 0:
+        return false, c
+
+      c = c.set_intersect( -s )
 
 
 TODO:

@@ -250,6 +250,13 @@ public:
         return res;
     }
 
+    void inplace_transform( const std::regular_invocable< literal > auto& f )
+    {
+        for ( auto& lit : _literals )
+            if ( lit != literal::separator )
+                lit = f( lit );
+    }
+
     [[nodiscard]] cnf_formula activate( variable activator ) const
     {
         auto res = cnf_formula{};

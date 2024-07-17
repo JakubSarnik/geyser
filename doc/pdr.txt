@@ -182,6 +182,8 @@ is_already_blocked( < c, i > : cube * int ) -> bool:
 
   for j in i .. k:
     for d in F[ j ]:
+      # TODO: Shouldn't all these subsumptions be the other way around? After
+      #       all, we want to keep the smaller clause (i.e. the smaller cube).
       if subsumes( d, c ):
         return true
 

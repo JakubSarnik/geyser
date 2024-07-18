@@ -9,12 +9,12 @@
 namespace geyser::pdr
 {
 
-class sorted_cube
+class ordered_cube
 {
     std::vector< literal > _literals;
 
 public:
-    explicit sorted_cube( std::vector< literal > literals )
+    explicit ordered_cube( std::vector< literal > literals )
         : _literals{ std::move( literals ) }
     {
         std::ranges::sort( _literals );
@@ -39,7 +39,7 @@ public:
     // this form a subset of literals in that. Note that c.subsumes( d ) = true
     // guarantees that d entails c.
     [[nodiscard]]
-    bool subsumes( const sorted_cube& that ) const
+    bool subsumes( const ordered_cube& that ) const
     {
         if ( this->_literals.size() > that._literals.size() )
             return false;

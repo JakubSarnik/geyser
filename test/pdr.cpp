@@ -26,7 +26,7 @@ TEST_CASE( "Cube negation works" )
 {
     SECTION( "Empty cube" )
     {
-        REQUIRE( to_nums( sorted_cube{ {} }.negate() ) == std::vector{ 0 } );
+        REQUIRE( to_nums( ordered_cube{ {} }.negate() ) == std::vector{ 0 } );
     }
 
     SECTION( "Non-empty cube" )
@@ -35,17 +35,17 @@ TEST_CASE( "Cube negation works" )
         auto b = literal{ variable{ 2 } };
         auto c = literal{ variable{ 3 } };
 
-        REQUIRE( to_nums( sorted_cube{ { a } }.negate() )
+        REQUIRE( to_nums( ordered_cube{ { a } }.negate() )
                  == std::vector{ -1, 0 } );
-        REQUIRE( to_nums( sorted_cube{ { !a } }.negate() )
+        REQUIRE( to_nums( ordered_cube{ { !a } }.negate() )
                  == std::vector{ 1, 0 } );
-        REQUIRE( to_nums( sorted_cube{ { a, !b, c } }.negate() )
+        REQUIRE( to_nums( ordered_cube{ { a, !b, c } }.negate() )
                 == std::vector{ 2, -1, -3, 0 } );
-        REQUIRE( to_nums( sorted_cube{ { !a, !b, c } }.negate() )
+        REQUIRE( to_nums( ordered_cube{ { !a, !b, c } }.negate() )
                  == std::vector{ 2, 1, -3, 0 } );
-        REQUIRE( to_nums( sorted_cube{ { a, b, c } }.negate() )
+        REQUIRE( to_nums( ordered_cube{ { a, b, c } }.negate() )
                  == std::vector{ -1, -2, -3, 0 } );
-        REQUIRE( to_nums( sorted_cube{ { !a, !b, !c } }.negate() )
+        REQUIRE( to_nums( ordered_cube{ { !a, !b, !c } }.negate() )
                  == std::vector{ 3, 2, 1, 0 } );
     }
 }
@@ -59,7 +59,7 @@ TEST_CASE( "Cube subsumption works" )
         for ( auto i : vals )
             v.emplace_back( variable{ std::abs( i ) }, i < 0 );
 
-        return sorted_cube( v );
+        return ordered_cube( v );
     };
 
     auto c0 = mk_cube( {} );

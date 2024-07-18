@@ -35,19 +35,16 @@ public:
         return f;
     }
 
-    // Returns true if this syntactically subsumes that, which is a sufficient
-    // condition that this |= that. Subsumption holds iff every literal in that
-    // occurs in this (with the same polarity).
-    // Example:
-    //   A /\ B /\ -C subsumes any of B, B /\ -C, A /\ -C, ...
-    //   A /\ B does not subsume B /\ -C
+    // Returns true if this syntactically subsumes that, i.e. if literals in
+    // this form a subset of literals in that. Note that c.subsumes( d ) = true
+    // guarantees that d entails c.
     [[nodiscard]]
     bool subsumes( const sorted_cube& that ) const
     {
-        if ( that._literals.size() > this->_literals.size() )
+        if ( this->_literals.size() > that._literals.size() )
             return false;
 
-        return std::ranges::includes( this->_literals, that._literals );
+        return std::ranges::includes( that._literals, this->_literals );
     }
 };
 

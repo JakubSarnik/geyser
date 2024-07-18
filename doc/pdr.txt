@@ -176,21 +176,18 @@ propagate() -> propagate_result:
 is_already_blocked( < c, i > : cube * int ) -> bool:
   assert 1 <= i <= k
 
-  # We first check whether all the states in c have already been blocked in
-  # R[ i ] (that is, whether they have been blocked somewhere between F[ i ]
-  # and F[ k ]) by checking for a simple syntactic subsumption of the cubes...
+  # We want to check whether R[ i ] |= -c. If there is a cube d between F[ i ]
+  # and F[ k ] that subsumes c (which guarantees c |= d), the result is
+  # immediate (since R[ i ] |= -d, -d |= -c).
 
   for j in i .. k:
     for d in F[ j ]:
-      # TODO: Shouldn't all these subsumptions be the other way around? After
-      #       all, we want to keep the smaller clause (i.e. the smaller cube).
       if subsumes( d, c ):
         return true
 
-  # ... only if this fails, we perform a more expensive SAT query
-  # SAT( R[ i ] /\ c ). This formula is satisfiable if and only if the cube
-  # c has non-empty intersection of states with R[ i ], i.e. when it hasn't
-  # been blocked yet.
+  # Only if this fails, we perform a more expensive SAT query
+  # SAT( R[ i ] /\ c ). This formula is satisfiable if and only if the
+  # entailment R[ i ] |= -c fails.
 
   return not is_sat_assuming( literals( c ), Act[ i ], ..., Act[ k ] )
 
@@ -201,7 +198,7 @@ add_blocked_at( c : cube, i : int ):
   # First add the cube c to F[ i ]. However, our trace can at this point
   # contain "strictly weaker information" which is easy to detect and remove:
   # If we already have a cube d in some F[ j ] (j <= i) that is subsumed by c,
-  # there is no reason to keep it.
+  # there is no reason to keep it, since c blocks at least as many states as d.
 
   for j in 1 .. k:
     for d in F[ j ]:
@@ -220,15 +217,17 @@ add_blocked_at( c : cube, i : int ):
 
 subsumes( c : cube, d : cube ) : bool
 
-  # A simple and syntactic (thus very conservative) check whether c |= d. This
-  # holds iff all the literals in d are also in c with the same polarity. We
-  # know this can't happen if d is actually larger than c.
+  # A cube c subsumes d if literals( c ) is a subset of literals( d ). For
+  # example, A /\ -B subsumes A /\ -B /\ C. Note that if c subsumes d, we have
+  # d |= c. Beware of the difference between this and the more common
+  # subsumption of clauses c and d, which is defined in the same way (e.g.
+  # A \/ -B subsumes A \/ -B \/ C), but guarantees c |= d instead!
 
-  if |literals( d )| > |literals( c )|:
+  if |literals( c )| > |literals( d )|:
     return false
 
-  for l in literals( d ):
-    if not literals( c ).contains( l ):
+  for l in literals( c ):
+    if not literals( d ).contains( l ):
       return false
 
   return true

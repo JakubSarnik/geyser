@@ -10,7 +10,7 @@ result pdr::run( const transition_system& system )
 
     initialize();
 
-    return unknown{};
+    return check( bound );
 }
 
 void pdr::initialize()
@@ -25,9 +25,58 @@ void pdr::initialize()
     _activated_error = _system->error().activate( _error_activator.var() );
 }
 
+result pdr::check( int bound )
+{
+    while ( k() < bound )
+    {
+        if ( const auto cex = block(); cex.has_value() )
+            return *cex;
+
+        push_frame();
+
+        if ( propagate() )
+            return ok{};
+
+        flush_ctis();
+    }
+
+    return unknown{};
+}
+
+std::optional< counterexample > pdr::block()
+{
+    assert( k() < _trace.size() );
+
+    while ( with_solver()
+            .assume( { _error_activator, _trace[ k() ].activator } )
+            .is_sat() )
+    {
+        auto state_vars = get_model( _system->state_vars() );
+        auto input_vars = get_model( _system->input_vars() );
+        const auto cti = make_cti( std::move( state_vars ), std::move( input_vars ) );
+
+        const auto cex = solve_obligation( proof_obligation{ cti, k() } );
+
+        if ( cex.has_value() )
+            return cex;
+    }
+
+    return {};
+}
+
+std::optional< counterexample > pdr::solve_obligation( proof_obligation po )
+{
+    // TODO
+}
+
+bool pdr::propagate()
+{
+    // TODO
+}
+
 void pdr::refresh_solver()
 {
-    trace( "Refreshing the solver" );
+    trace( "Refreshing the solver (k = {})", k() );
 
     assert( _system );
 

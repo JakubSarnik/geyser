@@ -128,6 +128,11 @@ class pdr : public engine
         valuation state_vars;
         valuation input_vars;
         std::optional< cti_handle > successor;
+
+        cti_entry( valuation state_vars, valuation input_vars, std::optional< cti_handle > successor )
+            : state_vars{ std::move( state_vars ) },
+              input_vars{ std::move( input_vars ) },
+              successor{ successor } {}
     };
 
     // TODO: Bradley also stores distance to the error and uses it as

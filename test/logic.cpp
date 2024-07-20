@@ -1,24 +1,10 @@
+#include "common.hpp"
 #include "logic.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <vector>
 #include <format>
 
 using namespace geyser;
-
-namespace
-{
-
-std::vector< int > to_nums( const cnf_formula& formula )
-{
-    auto res = std::vector< int >{};
-
-    for ( const auto lit : formula.literals() )
-        res.push_back( lit.value() );
-
-    return res;
-}
-
-} // namespace <anonymous>
 
 TEST_CASE( "Variables have the expected ids" )
 {

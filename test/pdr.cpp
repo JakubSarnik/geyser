@@ -1,26 +1,10 @@
+#include "common.hpp"
 #include "engine/pdr.hpp"
 #include <catch2/catch_test_macros.hpp>
-
 #include <vector>
 
 using namespace geyser;
 using namespace geyser::pdr;
-
-namespace
-{
-
-// TODO: This is duplicated in test/logic.cpp!
-std::vector< int > to_nums( const cnf_formula& formula )
-{
-    auto res = std::vector< int >{};
-
-    for ( const auto lit : formula.literals() )
-        res.push_back( lit.value() );
-
-    return res;
-}
-
-} // namespace <anonymous>
 
 TEST_CASE( "Cube negation works" )
 {

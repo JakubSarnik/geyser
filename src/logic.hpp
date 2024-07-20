@@ -106,6 +106,8 @@ class literal
     explicit literal( int value ) : _value{ value } {}
 
 public:
+    // TODO: Get rid of the inverted logic here, change the second parameter
+    //       to bool positive = true.
     explicit literal( variable var, bool negated = false ) : _value{ var.id() }
     {
         if ( negated )

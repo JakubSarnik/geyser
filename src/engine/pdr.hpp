@@ -47,6 +47,26 @@ public:
 
         return std::ranges::includes( that._literals, this->_literals );
     }
+
+    [[nodiscard]]
+    std::optional< literal > find( variable var ) const
+    {
+        const auto proj = []( literal l ){ return l.var(); };
+        const auto i = std::ranges::lower_bound( _literals, var,
+                                                 std::ranges::less{}, proj );
+
+        if ( i == _literals.end() || i->var() != var )
+            return {};
+
+        return *i;
+    }
+
+    [[nodiscard]]
+    const std::vector< literal >& literals() const { return _literals; }
+
+    // Used by the pool implementation in conjunction with the move assignment
+    // (see _cti_entries below) to reuse the allocated storage.
+    void clear() { _literals.clear(); }
 };
 
 class pdr : public engine
@@ -104,14 +124,6 @@ class pdr : public engine
         }
     };
 
-    struct frame
-    {
-        std::vector< ordered_cube > blocked_cubes;
-        literal activator;
-
-        explicit frame( literal activator ) : activator{ activator } {}
-    };
-
     // CTI (counterexample to induction) is either a model of the query
     // SAT( R[ k ] /\ E ), i.e. it is a model of both state variables X and
     // input variables Y so that input Y in state X leads to property
@@ -125,18 +137,19 @@ class pdr : public engine
     //       of the pool and keep a freelist/used flag!.
     struct cti_entry
     {
-        valuation state_vars;
-        valuation input_vars;
+        ordered_cube state_vars;
+        ordered_cube input_vars;
         std::optional< cti_handle > successor;
 
-        cti_entry( valuation state_vars, valuation input_vars, std::optional< cti_handle > successor )
+        cti_entry( ordered_cube state_vars, ordered_cube input_vars, std::optional< cti_handle > successor )
             : state_vars{ std::move( state_vars ) },
               input_vars{ std::move( input_vars ) },
               successor{ successor } {}
     };
 
     // TODO: Bradley also stores distance to the error and uses it as
-    //       a heuristic in the ordering. Investigate?
+    //       a heuristic in the ordering. Investigate? (Pass it by ref if it
+    //       becomes larger.)
     struct proof_obligation
     {
         // Declared in this order so that the defaulted comparison operator
@@ -161,7 +174,10 @@ class pdr : public engine
     cnf_formula _activated_trans;
     cnf_formula _activated_error;
 
-    std::vector< frame > _trace;
+    using cube_set = std::vector< ordered_cube >;
+
+    std::vector< cube_set > _trace_blocked_cubes;
+    std::vector< literal > _trace_activators;
 
     // How many solver queries to make before refreshing the solver to remove
     // all the accumulated subsumed clauses.
@@ -204,7 +220,7 @@ class pdr : public engine
         return _solver->val( var.id() ) > 0;
     }
 
-    valuation get_model( variable_range range )
+    ordered_cube get_model( variable_range range )
     {
         auto val = valuation{};
         val.reserve( range.size() );
@@ -212,12 +228,12 @@ class pdr : public engine
         for ( const auto var : range )
             val.emplace_back( var, !is_true( var ) );
 
-        return val;
+        return ordered_cube{ val };
     }
 
     // Beware that the handle is invalidated at the end of each check()
     // iteration!
-    cti_handle make_cti( valuation state_vars, valuation input_vars,
+    cti_handle make_cti( ordered_cube state_vars, ordered_cube input_vars,
                          std::optional< cti_handle > successor = std::nullopt )
     {
         if ( _num_cti_entries <= (cti_handle) _cti_entries.size() )
@@ -236,6 +252,12 @@ class pdr : public engine
         return _num_cti_entries++;
     }
 
+    cti_entry& get_cti( cti_handle handle )
+    {
+        assert( 0 <= handle && handle < _num_cti_entries );
+        return _cti_entries[ handle ];
+    }
+
     void flush_ctis()
     {
         for ( cti_handle i = 0; i < _num_cti_entries; ++i )
@@ -250,18 +272,38 @@ class pdr : public engine
 
     [[nodiscard]] int k() const
     {
-        return (int) _trace.size() - 1;
+        assert( _trace_blocked_cubes.size() == _trace_activators.size() );
+        return (int) _trace_blocked_cubes.size() - 1;
     }
 
     void push_frame()
     {
-        _trace.emplace_back( literal{ _store->make( std::format( "Act[{}]", k() + 1 ) ) } );
+        assert( _trace_blocked_cubes.size() == _trace_activators.size() );
+
+        _trace_blocked_cubes.emplace_back();
+        _trace_activators.emplace_back( _store->make( std::format( "Act[{}]", k() + 1 ) ) );
+    }
+
+    std::span< cube_set > frames_from( int level )
+    {
+        assert( 0 <= level && level <= k() );
+        return std::span{ _trace_blocked_cubes }.subspan( level );
+    }
+
+    std::span< literal > activators_from( int level )
+    {
+        assert( 0 <= level && level <= k() );
+        return std::span{ _trace_activators }.subspan( level );
     }
 
     void initialize();
     result check( int bound );
+
     std::optional< counterexample > block();
-    std::optional< counterexample > solve_obligation( proof_obligation po );
+    std::optional< counterexample > solve_obligation( proof_obligation cti_po );
+    counterexample build_counterexample( cti_handle initial );
+    bool is_already_blocked( proof_obligation po );
+
     bool propagate(); // Returns true if an invariant has been found
 
 public:

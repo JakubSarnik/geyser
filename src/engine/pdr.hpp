@@ -51,14 +51,14 @@ public:
     [[nodiscard]]
     std::optional< literal > find( variable var ) const
     {
-        const auto proj = []( literal l ){ return l.var(); };
-        const auto i = std::ranges::lower_bound( _literals, var,
-                                                 std::ranges::less{}, proj );
+        const auto lit = literal{ var };
 
-        if ( i == _literals.end() || i->var() != var )
-            return {};
+        if ( std::ranges::binary_search( _literals, lit ) )
+            return lit;
+        if ( std::ranges::binary_search( _literals, !lit ) )
+            return !lit;
 
-        return *i;
+        return {};
     }
 
     [[nodiscard]]

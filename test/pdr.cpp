@@ -91,3 +91,113 @@ TEST_CASE( "Cube subsumption works" )
     REQUIRE( !c6.subsumes( c3 ) );
     REQUIRE( !c6.subsumes( c1 ) );
 }
+
+TEST_CASE( "Literals are correctly found in ordered cubes" )
+{
+    const auto v1 = variable{ 1 };
+    const auto v2 = variable{ 2 };
+    const auto v3 = variable{ 3 };
+
+    const auto x = literal{ v1 };
+    const auto y = literal{ v2 };
+    const auto z = literal{ v3 };
+
+    SECTION( "Empty cube" )
+    {
+        const auto c = ordered_cube{ {} };
+
+        REQUIRE( !c.find( v1 ).has_value() );
+        REQUIRE( !c.find( v2 ).has_value() );
+        REQUIRE( !c.find( v3 ).has_value() );
+    }
+
+    SECTION( "Single positive literal" )
+    {
+        const auto c = ordered_cube{ { y } };
+
+        REQUIRE( !c.find( v1 ).has_value() );
+        REQUIRE( c.find( v2 ).has_value() );
+        REQUIRE( *c.find( v2 ) == y );
+        REQUIRE( !c.find( v3 ).has_value() );
+    }
+
+    SECTION( "Single negative literal" )
+    {
+        const auto c = ordered_cube{ { !y } };
+
+        REQUIRE( !c.find( v1 ).has_value() );
+        REQUIRE( c.find( v2 ).has_value() );
+        REQUIRE( *c.find( v2 ) == !y );
+        REQUIRE( !c.find( v3 ).has_value() );
+    }
+
+    SECTION( "Two literals, in order" )
+    {
+        const auto c = ordered_cube{ { x, z } };
+
+        REQUIRE( c.find( v1 ).has_value() );
+        REQUIRE( *c.find( v1 ) == x );
+        REQUIRE( !c.find( v2 ).has_value() );
+        REQUIRE( c.find( v3 ).has_value() );
+        REQUIRE( *c.find( v3 ) == z );
+    }
+
+    SECTION( "Two literals, out of order" )
+    {
+        const auto c = ordered_cube{ { z, x } };
+
+        REQUIRE( c.find( v1 ).has_value() );
+        REQUIRE( *c.find( v1 ) == x );
+        REQUIRE( !c.find( v2 ).has_value() );
+        REQUIRE( c.find( v3 ).has_value() );
+        REQUIRE( *c.find( v3 ) == z );
+    }
+
+    SECTION( "Three literals, all positive" )
+    {
+        const auto c = ordered_cube{ { x, y, z } };
+
+        REQUIRE( c.find( v1 ).has_value() );
+        REQUIRE( *c.find( v1 ) == x );
+        REQUIRE( c.find( v2 ).has_value() );
+        REQUIRE( *c.find( v2 ) == y );
+        REQUIRE( c.find( v3 ).has_value() );
+        REQUIRE( *c.find( v3 ) == z );
+    }
+
+    SECTION( "Three literals, all negative" )
+    {
+        const auto c = ordered_cube{ { !x, !y, !z } };
+
+        REQUIRE( c.find( v1 ).has_value() );
+        REQUIRE( *c.find( v1 ) == !x );
+        REQUIRE( c.find( v2 ).has_value() );
+        REQUIRE( *c.find( v2 ) == !y );
+        REQUIRE( c.find( v3 ).has_value() );
+        REQUIRE( *c.find( v3 ) == !z );
+    }
+
+    SECTION( "Three literals, mixed 1" )
+    {
+        const auto c = ordered_cube{ { !x, y, !z } };
+
+        REQUIRE( c.find( v1 ).has_value() );
+        REQUIRE( *c.find( v1 ) == !x );
+        REQUIRE( c.find( v2 ).has_value() );
+        REQUIRE( *c.find( v2 ) == y );
+        REQUIRE( c.find( v3 ).has_value() );
+        REQUIRE( *c.find( v3 ) == !z );
+    }
+
+    SECTION( "Three literals, mixed 2" )
+    {
+        const auto c = ordered_cube{ { x, y, !z } };
+
+        REQUIRE( c.find( v1 ).has_value() );
+        REQUIRE( *c.find( v1 ) == x );
+        REQUIRE( c.find( v2 ).has_value() );
+        REQUIRE( *c.find( v2 ) == y );
+        REQUIRE( c.find( v3 ).has_value() );
+        REQUIRE( *c.find( v3 ) == !z );
+    }
+}

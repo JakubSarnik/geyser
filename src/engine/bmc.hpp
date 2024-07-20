@@ -25,7 +25,7 @@ class bmc : public engine
     // Each state variable x in X (the set of state variables) occurs in various
     // versions x_0, x_1, ..., throughout the computation. We store the versioned
     // ranges contiguously, so that if the transition system contains e.g. state
-    // variables a, b in X with IDs 4, 5 (i.e. _system.state_vars() = [4, 6)),
+    // variables a, b in X with IDs 4, 5 (i.e. _system._state_vars() = [4, 6)),
     // a_4 and b_4 will have IDs in range _versioned_state_vars[ 4 ] = [k, l)
     // for some integers k <= l. As a minor optimization, a_0 and b_0 are the
     // original variables a, b (i.e. a_0 has id 4, b_0 has id 5). The same is

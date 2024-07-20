@@ -39,7 +39,7 @@ result pdr::check( int bound )
         if ( propagate() )
             return ok{};
 
-        flush_ctis();
+        _ctis.flush();
     }
 
     return unknown{};
@@ -55,7 +55,7 @@ std::optional< counterexample > pdr::block()
     {
         auto state_vars = get_model( _system->state_vars() );
         auto input_vars = get_model( _system->input_vars() );
-        const auto cti = make_cti( std::move( state_vars ), std::move( input_vars ) );
+        const auto cti = _ctis.make( std::move( state_vars ), std::move( input_vars ) );
 
         const auto cex = solve_obligation( proof_obligation{ cti, k() } );
 
@@ -68,7 +68,7 @@ std::optional< counterexample > pdr::block()
 
 std::optional< counterexample > pdr::solve_obligation( proof_obligation cti_po )
 {
-    assert( 0 <= cti_po.level && cti_po.level <= k() );
+    assert( 0 <= cti_po.level() && cti_po.level() <= k() );
 
     auto min_queue = std::priority_queue< proof_obligation,
         std::vector< proof_obligation >, std::greater<> >{};
@@ -80,8 +80,8 @@ std::optional< counterexample > pdr::solve_obligation( proof_obligation cti_po )
         auto po = min_queue.top();
         min_queue.pop();
 
-        if ( po.level == 0 )
-            return build_counterexample( po.cti );
+        if ( po.level() == 0 )
+            return build_counterexample( po.handle() );
 
         if ( is_already_blocked( po ) )
             continue;
@@ -111,17 +111,17 @@ counterexample pdr::build_counterexample( cti_handle initial )
         return row;
     };
 
-    auto entry = std::optional{ get_cti( initial ) };
+    auto entry = std::optional{ _ctis.get( initial ) };
 
-    auto initial_state = get_vars( _system->state_vars(), entry->state_vars );
+    auto initial_state = get_vars( _system->state_vars(), entry->state_vars() );
 
     auto inputs = std::vector< valuation >{};
     inputs.reserve( k() );
 
     while ( entry.has_value() )
     {
-        inputs.emplace_back( get_vars( _system->input_vars(), entry->input_vars ) );
-        entry = entry->successor.transform( [ & ]( cti_handle h ){ return get_cti( h ); } );
+        inputs.emplace_back( get_vars( _system->input_vars(), entry->input_vars() ) );
+        entry = entry->successor().transform( [ & ]( cti_handle h ){ return _ctis.get( h ); } );
     }
 
     return counterexample{ std::move( initial_state ), std::move( inputs ) };
@@ -129,16 +129,16 @@ counterexample pdr::build_counterexample( cti_handle initial )
 
 bool pdr::is_already_blocked( proof_obligation po )
 {
-    assert( 1 <= po.level && po.level <= k() );
+    assert( 1 <= po.level() && po.level() <= k() );
 
-    for ( const auto& frame : frames_from( po.level ) )
+    for ( const auto& frame : frames_from( po.level() ) )
         for ( const auto& cube : frame )
-            if ( cube.subsumes( get_cti( po.cti ).state_vars ) )
+            if ( cube.subsumes( _ctis.get( po.handle() ).state_vars() ) )
                 return true;
 
     const auto sat = with_solver()
-            .assume( get_cti( po.cti ).state_vars.literals() )
-            .assume( activators_from( po.level ) )
+            .assume( _ctis.get( po.handle() ).state_vars().literals() )
+            .assume( activators_from( po.level() ) )
             .is_sat();
 
     return !sat;

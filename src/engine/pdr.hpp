@@ -69,6 +69,105 @@ public:
     void clear() { _literals.clear(); }
 };
 
+// CTI (counterexample to induction) is either a (possibly generalized)
+// model of the query SAT( R[ k ] /\ E ), i.e. it is a model of both state
+// variables X and input variables Y so that input Y in state X leads to
+// property violation, or a found predecessor of such state. Following
+// Bradley's IC3Ref, we store these entries in a memory pool indexed by
+// numbers. Also, each entry stores its _successor's index, so that we can
+// recover a counterexample.
+using cti_handle = int;
+
+// TODO: Investigate whether we want to remove states in the middle
+//       of the pool and keep a freelist/used flag!.
+class cti_entry
+{
+    friend class cti_pool;
+
+    ordered_cube _state_vars;
+    ordered_cube _input_vars;
+    std::optional< cti_handle > _successor;
+
+public:
+    cti_entry( ordered_cube state_vars, ordered_cube input_vars, std::optional< cti_handle > successor )
+            : _state_vars{ std::move( state_vars ) },
+              _input_vars{ std::move( input_vars ) },
+              _successor{ successor } {}
+
+    [[nodiscard]] const ordered_cube& state_vars() const { return _state_vars; }
+    [[nodiscard]] const ordered_cube& input_vars() const { return _input_vars; }
+    [[nodiscard]] std::optional< cti_handle > successor() const { return _successor; }
+};
+
+class cti_pool
+{
+    // CTI entries are allocated in a pool _entries. At each point in time, it
+    // holds _num_entries at indices [0, _num_entries). All other entries in
+    // [_num_entries, _entries.size()) are unused and their memory is ready to
+    // be reused.
+    std::vector< cti_entry > _entries;
+    cti_handle _num_entries = 0;
+
+public:
+    // Beware that the handle is invalidated after the next call to flush!
+    [[nodiscard]]
+    cti_handle make( ordered_cube state_vars, ordered_cube input_vars,
+                     std::optional< cti_handle > successor = std::nullopt )
+    {
+        if ( _num_entries <= (cti_handle) _entries.size() )
+        {
+            _entries.emplace_back( std::move( state_vars ), std::move( input_vars ), successor );
+        }
+        else
+        {
+            auto& entry = _entries.back();
+
+            entry._state_vars = std::move( state_vars );
+            entry._input_vars = std::move( input_vars );
+            entry._successor = successor;
+        }
+
+        return _num_entries++;
+    }
+
+    [[nodiscard]] cti_entry& get( cti_handle handle )
+    {
+        assert( 0 <= handle && handle < _num_entries );
+        return _entries[ handle ];
+    }
+
+    void flush()
+    {
+        for ( cti_handle i = 0; i < _num_entries; ++i )
+        {
+            auto& entry = _entries.back();
+
+            entry._state_vars.clear();
+            entry._input_vars.clear();
+            entry._successor = std::nullopt;
+        }
+    }
+};
+
+// TODO: Bradley also stores distance to the error and uses it as
+//       a heuristic in the ordering. Investigate? (Pass it by ref if it
+//       becomes larger.)
+class proof_obligation
+{
+    // Declared in this order so that the defaulted comparison operator
+    // orders by level primarily.
+    int _level;
+    cti_handle _handle;
+
+public:
+    proof_obligation( cti_handle handle, int level ) : _level{ level }, _handle{ handle } {};
+
+    friend auto operator<=>( proof_obligation, proof_obligation ) = default;
+
+    [[nodiscard]] int level() const { return _level; }
+    [[nodiscard]] cti_handle handle() const { return _handle; }
+};
+
 class pdr : public engine
 {
     class query_builder
@@ -124,44 +223,6 @@ class pdr : public engine
         }
     };
 
-    // CTI (counterexample to induction) is either a model of the query
-    // SAT( R[ k ] /\ E ), i.e. it is a model of both state variables X and
-    // input variables Y so that input Y in state X leads to property
-    // violation, or a found predecessor of such state. Following Bradley's
-    // IC3Ref, we store these entries in a memory pool indexed by numbers.
-    // Also, each entry stores its successor's index, so that we can recover
-    // a counterexample.
-    using cti_handle = int;
-
-    // TODO: Investigate whether we want to remove states in the middle
-    //       of the pool and keep a freelist/used flag!.
-    struct cti_entry
-    {
-        ordered_cube state_vars;
-        ordered_cube input_vars;
-        std::optional< cti_handle > successor;
-
-        cti_entry( ordered_cube state_vars, ordered_cube input_vars, std::optional< cti_handle > successor )
-            : state_vars{ std::move( state_vars ) },
-              input_vars{ std::move( input_vars ) },
-              successor{ successor } {}
-    };
-
-    // TODO: Bradley also stores distance to the error and uses it as
-    //       a heuristic in the ordering. Investigate? (Pass it by ref if it
-    //       becomes larger.)
-    struct proof_obligation
-    {
-        // Declared in this order so that the defaulted comparison operator
-        // orders by level primarily.
-        int level;
-        cti_handle cti;
-
-        proof_obligation( cti_handle cti, int level ) : level{ level }, cti{ cti } {};
-
-        friend auto operator<=>( proof_obligation, proof_obligation ) = default;
-    };
-
     using engine::engine;
 
     std::unique_ptr< CaDiCaL::Solver > _solver;
@@ -184,12 +245,7 @@ class pdr : public engine
     constexpr static int solver_refresh_rate = 5000;
     int _queries = 0;
 
-    // CTI entries are allocated in a pool _cti_entries. At each point in time,
-    // it holds _num_cti_entries at indices [0, _num_cti_entries). All other
-    // entries in [_num_cti_entries, _cti_entries.size()) are unused and their
-    // memory is ready to be reused.
-    std::vector< cti_entry > _cti_entries;
-    cti_handle _num_cti_entries = 0;
+    cti_pool _ctis;
 
     void refresh_solver();
 
@@ -229,45 +285,6 @@ class pdr : public engine
             val.emplace_back( var, !is_true( var ) );
 
         return ordered_cube{ val };
-    }
-
-    // Beware that the handle is invalidated at the end of each check()
-    // iteration!
-    cti_handle make_cti( ordered_cube state_vars, ordered_cube input_vars,
-                         std::optional< cti_handle > successor = std::nullopt )
-    {
-        if ( _num_cti_entries <= (cti_handle) _cti_entries.size() )
-        {
-            _cti_entries.emplace_back( std::move( state_vars ), std::move( input_vars ), successor );
-        }
-        else
-        {
-            auto& entry = _cti_entries.back();
-
-            entry.state_vars = std::move( state_vars );
-            entry.input_vars = std::move( input_vars );
-            entry.successor = successor;
-        }
-
-        return _num_cti_entries++;
-    }
-
-    cti_entry& get_cti( cti_handle handle )
-    {
-        assert( 0 <= handle && handle < _num_cti_entries );
-        return _cti_entries[ handle ];
-    }
-
-    void flush_ctis()
-    {
-        for ( cti_handle i = 0; i < _num_cti_entries; ++i )
-        {
-            auto& entry = _cti_entries.back();
-
-            entry.state_vars.clear();
-            entry.input_vars.clear();
-            entry.successor = std::nullopt;
-        }
     }
 
     [[nodiscard]] int k() const

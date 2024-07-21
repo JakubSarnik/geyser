@@ -135,6 +135,8 @@ solve_obligation( < s, k' > : cube * int ) -> result:
 
       add_blocked_at( d, i )
 
+  return still_safe;
+
 
 push_frame():
   assert |F| = |Act|

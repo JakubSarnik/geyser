@@ -6,6 +6,55 @@
 using namespace geyser;
 using namespace geyser::pdr;
 
+TEST_CASE( "Cube construction works" )
+{
+    const auto v1 = variable{ 1 };
+    const auto v2 = variable{ 2 };
+    const auto v3 = variable{ 3 };
+
+    const auto x = literal{ v1 };
+    const auto y = literal{ v2 };
+    const auto z = literal{ v3 };
+
+    SECTION( "From an empty vector" )
+    {
+        REQUIRE( to_nums( ordered_cube{ {} }.literals() )
+                 == std::vector< int >{} );
+    }
+
+    SECTION( "From an unsorted vector" )
+    {
+        REQUIRE( to_nums( ordered_cube{ { x, z } }.literals() )
+                 == std::vector{ 1, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { !x, z } }.literals() )
+                 == std::vector{ -1, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { x, !z } }.literals() )
+                 == std::vector{ -3, 1 } );
+        REQUIRE( to_nums( ordered_cube{ { x, y, z } }.literals() )
+            == std::vector{ 1, 2, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { x, !y, z } }.literals() )
+                 == std::vector{ -2, 1, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { !x, !y, !z } }.literals() )
+                 == std::vector{ -3, -2, -1 } );
+    }
+
+    SECTION( "From a sorted vector" )
+    {
+        REQUIRE( to_nums( ordered_cube{ { x, z }, sorted_tag }.literals() )
+                 == std::vector{ 1, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { !x, z }, sorted_tag }.literals() )
+                 == std::vector{ -1, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { !z, x }, sorted_tag }.literals() )
+                 == std::vector{ -3, 1 } );
+        REQUIRE( to_nums( ordered_cube{ { x, y, z }, sorted_tag }.literals() )
+                 == std::vector{ 1, 2, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { !y, x, z }, sorted_tag }.literals() )
+                 == std::vector{ -2, 1, 3 } );
+        REQUIRE( to_nums( ordered_cube{ { !z, !y, !x }, sorted_tag }.literals() )
+                 == std::vector{ -3, -2, -1 } );
+    }
+}
+
 TEST_CASE( "Cube negation works" )
 {
     SECTION( "Empty cube" )
@@ -183,5 +232,87 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
         REQUIRE( *c.find( v2 ) == y );
         REQUIRE( c.find( v3 ).has_value() );
         REQUIRE( *c.find( v3 ) == !z );
+    }
+}
+
+TEST_CASE( "CTI pool works" )
+{
+    const auto c0 = ordered_cube{ {} };
+    const auto c1 = ordered_cube{ to_literals( { 1, 2, 3 } ) };
+    const auto c2 = ordered_cube{ to_literals( { 1, -2, 3 } ) };
+    const auto c3 = ordered_cube{ to_literals( { -10, 12 } ) };
+
+    auto pool = cti_pool{};
+
+    const auto check_handle = [ & ]( cti_handle h,
+            const ordered_cube& s, const ordered_cube& i, std::optional< cti_handle > succ )
+    {
+        REQUIRE( pool.get( h ).state_vars() == s );
+        REQUIRE( pool.get( h ).input_vars() == i );
+        REQUIRE( pool.get( h ).successor() == succ );
+    };
+
+    {
+        const auto h1 = pool.make( c1, c2 );
+
+        check_handle( h1, c1, c2, std::nullopt );
+
+        const auto h2 = pool.make( c0, c3, h1 );
+
+        check_handle( h1, c1, c2, std::nullopt );
+        check_handle( h2, c0, c3, h1 );
+    }
+
+    pool.flush();
+
+    {
+        const auto h1 = pool.make( c3, c2 );
+
+        check_handle( h1, c3, c2, std::nullopt );
+
+        const auto h2 = pool.make( c3, c3, h1 );
+
+        check_handle( h1, c3, c2, std::nullopt );
+        check_handle( h2, c3, c3, h1 );
+
+        const auto h3 = pool.make( c1, c2, h1 );
+
+        check_handle( h1, c3, c2, std::nullopt );
+        check_handle( h2, c3, c3, h1 );
+        check_handle( h3, c1, c2, h1 );
+    }
+
+    pool.flush();
+
+    {
+        const auto h1 = pool.make( c0, c0 );
+
+        check_handle( h1, c0, c0, std::nullopt );
+    }
+
+    pool.flush();
+
+    {
+        const auto h1 = pool.make( c1, c1 );
+
+        check_handle( h1, c1, c1, std::nullopt );
+
+        const auto h2 = pool.make( c2, c1, std::nullopt );
+
+        check_handle( h1, c1, c1, std::nullopt );
+        check_handle( h2, c2, c1, std::nullopt );
+
+        const auto h3 = pool.make( c2, c3, h1 );
+
+        check_handle( h1, c1, c1, std::nullopt );
+        check_handle( h2, c2, c1, std::nullopt );
+        check_handle( h3, c2, c3, h1 );
+
+        const auto h4 = pool.make( c3, c1, h1 );
+
+        check_handle( h1, c1, c1, std::nullopt );
+        check_handle( h2, c2, c1, std::nullopt );
+        check_handle( h3, c2, c3, h1 );
+        check_handle( h4, c3, c1, h1 );
     }
 }

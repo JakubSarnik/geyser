@@ -106,7 +106,7 @@ solve_obligation( < s, k' > : cube * int ) -> result:
 
       # c has a predecessor d in R[ i - 1 ], generalize a full cube of d to
       # a shorter cube.
-      d = generalized_predecessor( c )
+      d = generalize_predecessor( c )
 
       # Focus now on blocking d one step closer to the initial states.
       Q.add( < d, i - 1 > )
@@ -237,7 +237,7 @@ subsumes( c : cube, d : cube ) : bool
   return true
 
 
-generalized_predecessor( s : cube ) -> cube:
+generalize_predecessor( s : cube ) -> cube:
   assert s.all( fun lit => var( lit ).is_state_variable )
 
   # We found that s is a cube satisfying R[ i - 1 ] /\ -s /\ T /\ s' for some
@@ -362,7 +362,7 @@ down( c : clause, i : int, level : int, req : set[ literal ] )
     # Here we know that c is not inductive relative to R[ i ], i.e. it has
     # a predecessor in R[ i ].
 
-    s = generalized_predecessor( -c )
+    s = generalize_predecessor( -c )
 
     # SAT( I /\ s )?
     q1 = is_sat_assuming( Act[ 0 ], literals( s ) )

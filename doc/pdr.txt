@@ -157,7 +157,7 @@ propagate() -> propagate_result:
 
       if not is_sat_assuming( ActT, literals( c' ), Act[ i ], ..., Act[ k ] ):
 
-        # Beware here that add_blocked_at will actually remove the clause c
+        # Beware here that add_blocked_at will actually remove the cube c
         # from F[ i ] as subsumed (by itself). Depending on implementation,
         # this can, e.g., reorder F[ i ] or do all sort of things with it,
         # and the implementation of iteration through F[ i ] must react to
@@ -204,7 +204,7 @@ add_blocked_at( c : cube, i : int ):
   # If we already have a cube d in some F[ j ] (j <= i) that is subsumed by c,
   # there is no reason to keep it, since c blocks at least as many states as d.
 
-  for j in 1 .. k:
+  for j in 1 .. i:
     for d in F[ j ]:
       if subsumes( c, d ):
         F[ j ].remove( d )

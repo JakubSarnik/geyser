@@ -10,6 +10,9 @@
 namespace geyser::pdr
 {
 
+struct sorted_tag_t {};
+constexpr sorted_tag_t sorted_tag{};
+
 class ordered_cube
 {
     std::vector< literal > _literals;
@@ -20,6 +23,12 @@ public:
     {
         std::ranges::sort( _literals );
     };
+
+    ordered_cube( std::vector< literal > literals, sorted_tag_t )
+        : _literals{ std::move( literals ) }
+    {
+        assert( std::ranges::is_sorted( _literals ) );
+    }
 
     // Returns the cube negated as a cnf_formula containing a single clause.
     [[nodiscard]]
@@ -317,11 +326,17 @@ class pdr : public engine
     result check( int bound );
 
     std::optional< counterexample > block();
+
     std::optional< counterexample > solve_obligation( proof_obligation cti_po );
     counterexample build_counterexample( cti_handle initial );
     bool is_already_blocked( proof_obligation po );
+    cti_handle generalize_predecessor( cti_handle cti );
+    cti_handle generalize_inductive( proof_obligation po );
+    void add_blocked_at( const ordered_cube& cube, int level );
 
     bool propagate(); // Returns true if an invariant has been found
+
+    ordered_cube prime_cube( const ordered_cube& cube ) const;
 
 public:
     [[nodiscard]] result run( const transition_system& system ) override;

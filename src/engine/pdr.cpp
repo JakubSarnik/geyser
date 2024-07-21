@@ -86,8 +86,32 @@ std::optional< counterexample > pdr::solve_obligation( proof_obligation cti_po )
         if ( is_already_blocked( po ) )
             continue;
 
-        // TODO
+        // TODO: Assert !intersects_initial( po.handle().state_variables() )
+
+        assert( po.level() >= 1 );
+
+        const auto& state_vars = _ctis.get( po.handle() ).state_vars();
+
+        if ( with_solver()
+                .constrain( state_vars.negate() )
+                .assume( _transition_activator )
+                .assume( prime_cube( state_vars ).literals() )
+                .assume( activators_from( po.level() - 1 ) )
+                .is_sat() )
+        {
+            const auto pred_handle = generalize_predecessor( po.handle() );
+
+            min_queue.emplace( pred_handle, po.level() - 1 );
+            min_queue.push( po );
+        }
+        else
+        {
+            const auto gen = generalize_inductive( po );
+            add_blocked_at( _ctis.get( gen ).state_vars(), po.level() );
+        }
     }
+
+    return {};
 }
 
 counterexample pdr::build_counterexample( cti_handle initial )
@@ -144,9 +168,93 @@ bool pdr::is_already_blocked( proof_obligation po )
     return !sat;
 }
 
-bool pdr::propagate()
+cti_handle pdr::generalize_predecessor( cti_handle cti )
 {
     // TODO
+}
+
+cti_handle pdr::generalize_inductive( proof_obligation po )
+{
+    // TODO
+    // TODO: po.level() or po.level() - 1???
+}
+
+void pdr::add_blocked_at( const ordered_cube& c, int level )
+{
+    assert( 1 <= level && level <= k() );
+
+    // TODO: Do we really have to always start from 1 here?
+    // TODO: Check that this horrible thing works. Consider changing
+    //       to a simple copy of cubes down in propagate() if not...
+    for ( int i = 1; i <= level; ++i )
+    {
+        auto& frame = _trace_blocked_cubes[ i ];
+
+        for ( auto it = frame.begin(); it != frame.end(); )
+        {
+            if ( c.subsumes( *it ) )
+            {
+                const auto last = frame.end() - 1;
+
+                if ( it == last )
+                {
+                    frame.pop_back();
+                    it = frame.end(); // Iterator it was invalidated.
+                }
+                else
+                {
+                    std::iter_swap( it, last );
+                    frame.pop_back();
+                }
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+}
+
+bool pdr::propagate()
+{
+    assert( _trace_blocked_cubes[ k() ].empty() );
+
+    for ( int i = 1; i < k(); ++i )
+    {
+        // We maintain the invariant that cubes doesn't contain a pair of
+        // cubes c, d such that c subsumes d (this is ensured by
+        // add_blocked_at). As such, the call to add_blocked_at removes
+        // from the i-th frame precisely the single cube that is subsumed
+        // by the cube being added to the (i + 1)-th frame -- the very same
+        // cube.
+        //
+        // The removal is done by swapping the last cube in the set with
+        // the removed cube and popping the back. As such, whenever we call
+        // add_blocked_at, we don't move forward in cubes, since the same
+        // position will now be occupied by a clause that was at the end
+        // (or we will already be at the end and stop).
+
+        const auto& cubes = _trace_blocked_cubes[ i ];
+
+        for ( int j = 0; j < cubes.size(); )
+        {
+            const auto& c = _trace_blocked_cubes[ i ][ j ];
+
+            if ( !( with_solver()
+                    .assume( _transition_activator )
+                    .assume( prime_cube( c ).literals())
+                    .assume( activators_from( i ))
+                    .is_sat()))
+                add_blocked_at( c, i + 1 );
+            else
+                ++j;
+        }
+
+        if ( cubes.empty() )
+            return true;
+    }
+
+    return false;
 }
 
 void pdr::refresh_solver()
@@ -165,6 +273,28 @@ void pdr::refresh_solver()
     for ( const auto& [ cubes, act ] : std::views::zip( _trace_blocked_cubes, _trace_activators ) )
         for ( const auto& cube : cubes )
             assert_formula( cube.negate().activate( act.var() ) );
+}
+
+ordered_cube pdr::prime_cube( const ordered_cube& cube ) const
+{
+    auto lits = cube.literals();
+
+    for ( auto& lit : lits )
+    {
+        const auto [ type, pos ] = _system->get_var_info( lit.var() );
+
+        switch ( type )
+        {
+            case var_type::state:
+                lit = lit.substitute( _system->next_state_vars().nth( pos ) );
+            default:
+                trace( "An unexpected variable ({}) has occurred during priming in PDR",
+                       std::to_underlying( type ) );
+                std::terminate(); // Unreachable
+        }
+    }
+
+    return ordered_cube{ lits, sorted_tag };
 }
 
 } // namespace geyser::pdr

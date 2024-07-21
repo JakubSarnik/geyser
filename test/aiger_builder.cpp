@@ -1,7 +1,7 @@
+#include "common.hpp"
 #include "aiger_builder.hpp"
 #include "caiger.hpp"
 #include <catch2/catch_test_macros.hpp>
-#include <cmath>
 
 using namespace geyser;
 using namespace geyser::builder;
@@ -17,21 +17,6 @@ aiger_ptr read_aiger( const char* str )
     REQUIRE( err == nullptr );
 
     return aig;
-}
-
-std::vector< literal > to_literals( const std::vector< int >& nums )
-{
-    auto res = std::vector< literal >{};
-
-    for ( const auto num : nums )
-    {
-        if ( num == 0 )
-            res.push_back( literal::separator );
-        else
-            res.emplace_back( variable{ std::abs( num ) }, num < 0 );
-    }
-
-    return res;
 }
 
 struct expected_system

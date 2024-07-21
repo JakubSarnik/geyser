@@ -24,11 +24,13 @@ public:
         std::ranges::sort( _literals );
     };
 
-    ordered_cube( std::vector< literal > literals, sorted_tag_t )
+    ordered_cube( std::vector< literal > literals, sorted_tag_t ) // NOLINT
         : _literals{ std::move( literals ) }
     {
         assert( std::ranges::is_sorted( _literals ) );
     }
+
+    friend bool operator==( const ordered_cube&, const ordered_cube& ) = default;
 
     // Returns the cube negated as a cnf_formula containing a single clause.
     [[nodiscard]]
@@ -72,10 +74,6 @@ public:
 
     [[nodiscard]]
     const std::vector< literal >& literals() const { return _literals; }
-
-    // Used by the pool implementation in conjunction with the move assignment
-    // (see _cti_entries below) to reuse the allocated storage.
-    void clear() { _literals.clear(); }
 };
 
 // CTI (counterexample to induction) is either a (possibly generalized)
@@ -123,13 +121,13 @@ public:
     cti_handle make( ordered_cube state_vars, ordered_cube input_vars,
                      std::optional< cti_handle > successor = std::nullopt )
     {
-        if ( _num_entries <= (cti_handle) _entries.size() )
+        if ( _num_entries >= ( cti_handle ) _entries.size() )
         {
             _entries.emplace_back( std::move( state_vars ), std::move( input_vars ), successor );
         }
         else
         {
-            auto& entry = _entries.back();
+            auto& entry = _entries[ _num_entries ];
 
             entry._state_vars = std::move( state_vars );
             entry._input_vars = std::move( input_vars );
@@ -147,14 +145,7 @@ public:
 
     void flush()
     {
-        for ( cti_handle i = 0; i < _num_entries; ++i )
-        {
-            auto& entry = _entries.back();
-
-            entry._state_vars.clear();
-            entry._input_vars.clear();
-            entry._successor = std::nullopt;
-        }
+        _num_entries = 0;
     }
 };
 
@@ -169,7 +160,7 @@ class proof_obligation
     cti_handle _handle;
 
 public:
-    proof_obligation( cti_handle handle, int level ) : _level{ level }, _handle{ handle } {};
+    proof_obligation( cti_handle handle, int level ) : _level{ level }, _handle{ handle } {}; // NOLINT
 
     friend auto operator<=>( proof_obligation, proof_obligation ) = default;
 
@@ -296,6 +287,22 @@ class pdr : public engine
         return ordered_cube{ val };
     }
 
+    // Get a cube that contains only those literals from 'cube' that are in the
+    // unsat core.
+    ordered_cube get_unsat_core( const ordered_cube& cube )
+    {
+        assert( _solver );
+        assert( ( _solver->state() & CaDiCaL::UNSATISFIED ) != 0 );
+
+        auto lits = std::vector< literal >{};
+
+        for ( const auto lit : cube.literals() )
+            if ( _solver->failed( lit.value() ) )
+                lits.emplace_back( lit );
+
+        return ordered_cube{ lits, sorted_tag };
+    }
+
     [[nodiscard]] int k() const
     {
         assert( _trace_blocked_cubes.size() == _trace_activators.size() );
@@ -332,7 +339,7 @@ class pdr : public engine
     bool is_already_blocked( proof_obligation po );
     cti_handle generalize_predecessor( cti_handle cti );
     cti_handle generalize_inductive( proof_obligation po );
-    void add_blocked_at( const ordered_cube& cube, int level );
+    void add_blocked_at( const ordered_cube& cube, int level, int start_from = 1 );
 
     bool propagate(); // Returns true if an invariant has been found
 

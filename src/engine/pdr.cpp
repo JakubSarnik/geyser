@@ -170,47 +170,57 @@ bool pdr::is_already_blocked( proof_obligation po )
 
 cti_handle pdr::generalize_predecessor( cti_handle cti )
 {
-    // TODO
+    auto ins = get_model( _system->input_vars() );
+    auto p = get_model( _system->state_vars() );
+    auto s = _ctis.get( cti ).state_vars();
+
+    while ( true )
+    {
+        [[maybe_unused]]
+        auto sat = with_solver()
+                .constrain( prime_cube( s ).negate() )
+                .assume( _transition_activator )
+                .assume( ins.literals() )
+                .assume( p.literals() )
+                .is_sat();
+
+        assert ( !sat );
+
+        s = get_unsat_core( p );
+
+        if ( s == p )
+            return _ctis.make( std::move( s ), std::move( ins ), cti );
+
+        p = s;
+    }
 }
 
 cti_handle pdr::generalize_inductive( proof_obligation po )
 {
-    // TODO
     // TODO: po.level() or po.level() - 1???
+    // TODO: Implement a proper generalization...
+
+    return po.handle();
 }
 
-void pdr::add_blocked_at( const ordered_cube& c, int level )
+void pdr::add_blocked_at( const ordered_cube& c, int level, int start_from /* = 1*/ )
 {
     assert( 1 <= level && level <= k() );
+    assert( 1 <= start_from && start_from <= level );
 
-    // TODO: Do we really have to always start from 1 here?
-    // TODO: Check that this horrible thing works. Consider changing
-    //       to a simple copy of cubes down in propagate() if not...
-    for ( int i = 1; i <= level; ++i )
+    for ( int i = start_from; i <= level; ++i )
     {
-        auto& frame = _trace_blocked_cubes[ i ];
+        auto& cubes = _trace_blocked_cubes[ i ];
 
-        for ( auto it = frame.begin(); it != frame.end(); )
+        for ( int j = 0; j < cubes.size(); )
         {
-            if ( c.subsumes( *it ) )
+            if ( c.subsumes( cubes[ j ] ) )
             {
-                const auto last = frame.end() - 1;
-
-                if ( it == last )
-                {
-                    frame.pop_back();
-                    it = frame.end(); // Iterator it was invalidated.
-                }
-                else
-                {
-                    std::iter_swap( it, last );
-                    frame.pop_back();
-                }
+                std::swap( cubes[ j ], cubes[ cubes.size() - 1 ] );
+                cubes.pop_back();
             }
             else
-            {
-                ++it;
-            }
+                ++j;
         }
     }
 }
@@ -245,7 +255,7 @@ bool pdr::propagate()
                     .assume( prime_cube( c ).literals())
                     .assume( activators_from( i ))
                     .is_sat()))
-                add_blocked_at( c, i + 1 );
+                add_blocked_at( c, i + 1, i );
             else
                 ++j;
         }

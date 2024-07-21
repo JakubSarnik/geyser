@@ -118,20 +118,22 @@ solve_obligation( < s, k' > : cube * int ) -> result:
       # There is no predecessor in R[ i - 1 ] of any state in c
       # Generalize cube c to block more states.
 
-      # TODO: Not generalize_inductive( c, i - 1 )???
-      < d, j > = generalize_inductive( c, i )
+      # TODO: Not generalize_inductive( c, i - 1 )??? And don't we want to
+      #       change the level from i to some general j? See the following
+      #       comment...
+      d = generalize_inductive( c, i )
 
-      # Note that Een et al.'s generalization is quite a bit more involved
-      # here, and we need to access the unsat core of the SAT call.
+      # Note that Een et al.'s generalization is quite a bit more involved here
+      # and we need to access the unsat core of the SAT call. There,
+      # generalize_inductive returns < d, j >, and the code would look
+      # differently:
+      #
+      #   add_blocked_at( d, j )
+      #
+      #   if i < k:
+      #     Q.add( < c, j > )
 
-      add_blocked_at( d, j )
-
-      # This is not necessary according to Een et al., but it apparently
-      # improves performance.
-      # TODO: Investigate
-
-      if i < k && j != inf:
-        Q.add( < c, j > )
+      add_blocked_at( d, i )
 
 
 push_frame():

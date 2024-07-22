@@ -19,9 +19,6 @@ void pdr::initialize()
 {
     push_frame();
 
-    _transition_activator = literal{ _store->make( "ActT" ) };
-    _error_activator = literal{ _store->make( "ActE" ) };
-
     _activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
     _activated_trans = _system->trans().activate( _transition_activator.var() );
     _activated_error = _system->error().activate( _error_activator.var() );
@@ -223,6 +220,12 @@ void pdr::add_blocked_at( const ordered_cube& c, int level, int start_from /* = 
                 ++j;
         }
     }
+
+    assert( level < _trace_blocked_cubes.size() );
+    assert( level < _trace_activators.size() );
+
+    _trace_blocked_cubes[ level ].emplace_back( c );
+    assert_formula( c.negate().activate( _trace_activators[ level ].var() ) );
 }
 
 bool pdr::propagate()
@@ -297,6 +300,7 @@ ordered_cube pdr::prime_cube( const ordered_cube& cube ) const
         {
             case var_type::state:
                 lit = lit.substitute( _system->next_state_vars().nth( pos ) );
+                break;
             default:
                 trace( "An unexpected variable ({}) has occurred during priming in PDR",
                        std::to_underlying( type ) );

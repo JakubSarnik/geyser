@@ -160,7 +160,10 @@ class proof_obligation
     cti_handle _handle;
 
 public:
-    proof_obligation( cti_handle handle, int level ) : _level{ level }, _handle{ handle } {}; // NOLINT
+    proof_obligation( cti_handle handle, int level ) : _level{ level }, _handle{ handle } // NOLINT
+    {
+        assert( _level >= 0 );
+    };
 
     friend auto operator<=>( proof_obligation, proof_obligation ) = default;
 
@@ -223,8 +226,6 @@ class pdr : public engine
         }
     };
 
-    using engine::engine;
-
     std::unique_ptr< CaDiCaL::Solver > _solver;
     const transition_system* _system = nullptr;
 
@@ -251,8 +252,10 @@ class pdr : public engine
 
     query_builder with_solver()
     {
-        if ( _queries++ % solver_refresh_rate == 0 )
+        if ( _queries % solver_refresh_rate == 0 )
             refresh_solver();
+
+        ++_queries;
 
         assert( _solver );
         return query_builder{ *_solver };
@@ -305,7 +308,6 @@ class pdr : public engine
 
     [[nodiscard]] int k() const
     {
-        assert( _trace_blocked_cubes.size() == _trace_activators.size() );
         return (int) _trace_blocked_cubes.size() - 1;
     }
 
@@ -346,6 +348,10 @@ class pdr : public engine
     ordered_cube prime_cube( const ordered_cube& cube ) const;
 
 public:
+    pdr( const options& opts, variable_store& store )
+        : engine( opts, store ), _transition_activator{ _store->make( "ActT" ) },
+          _error_activator{ _store->make( "ActE" ) } {}
+
     [[nodiscard]] result run( const transition_system& system ) override;
 };
 

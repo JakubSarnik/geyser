@@ -1,5 +1,7 @@
 #pragma once
 #include "logic.hpp"
+#include "caiger.hpp"
+#include "catch2/catch_test_macros.hpp"
 #include <vector>
 #include <cmath>
 
@@ -31,4 +33,14 @@ inline std::vector< geyser::literal > to_literals( const std::vector< int >& num
     }
 
     return res;
+}
+
+inline geyser::aiger_ptr read_aiger( const char* str )
+{
+    auto aig = geyser::make_aiger();
+    const auto* const err = aiger_read_from_string( aig.get(), str );
+
+    REQUIRE( err == nullptr );
+
+    return aig;
 }

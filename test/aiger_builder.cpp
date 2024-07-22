@@ -1,23 +1,11 @@
 #include "common.hpp"
 #include "aiger_builder.hpp"
-#include "caiger.hpp"
-#include <catch2/catch_test_macros.hpp>
 
 using namespace geyser;
 using namespace geyser::builder;
 
 namespace
 {
-
-aiger_ptr read_aiger( const char* str )
-{
-    auto aig = make_aiger();
-    const auto* const err = aiger_read_from_string( aig.get(), str );
-
-    REQUIRE( err == nullptr );
-
-    return aig;
-}
 
 struct expected_system
 {

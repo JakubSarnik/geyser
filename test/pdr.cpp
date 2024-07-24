@@ -497,4 +497,40 @@ TEST_CASE( "PDR works on a simple system" )
 
         REQUIRE( ( upper_path || lower_path ) );
     }
+
+    SECTION( "Trivially safe four state system" )
+    {
+        const auto* const str =
+                "aag 10 1 2 1 7\n"
+                "2\n"         // i
+                "4 19\n"      // x
+                "6 21\n"      // y
+                "0\n"         // error is False
+                "8 5 3\n"     // -x /\ -i
+                "10 7 2\n"    // -y /\ i
+                "12 4 6\n"    // x /\ y
+                "14 4 2\n"    // x /\ i
+                "16 6 3\n"    // y /\ -i
+                "18 9 15\n"   // -[ (-x /\ -i) \/ (x /\ i) ]
+                "20 11 17\n"; // -[ (-y /\ i) \/ (y /\ -i) ]
+
+        const auto system = system_from_aiger( store, str );
+        auto res = engine.run( system );
+
+        REQUIRE( std::holds_alternative< ok >( res ) );
+    }
+
+    SECTION( "Non-trivially safe two state system" )
+    {
+        // States 0 and 1, self loops, 0 initial, 1 error
+        const auto* const str =
+                "aag 1 0 1 1 0\n"
+                "2 2\n"
+                "2\n";
+
+        const auto system = system_from_aiger( store, str );
+        auto res = engine.run( system );
+
+        REQUIRE( std::holds_alternative< ok >( res ) );
+    }
 }

@@ -39,11 +39,13 @@ result pdr::check( int bound )
         _ctis.flush();
     }
 
-    return unknown{};
+    return unknown{ std::format( "counterexample not found after {} frames", bound ) };
 }
 
 std::optional< counterexample > pdr::block()
 {
+    trace( "Blocking (k = {})", k() );
+
     assert( k() < _trace_blocked_cubes.size() );
 
     while ( with_solver()
@@ -230,6 +232,8 @@ void pdr::add_blocked_at( const ordered_cube& c, int level, int start_from /* = 
 
 bool pdr::propagate()
 {
+    trace( "Propagating (k = {})", k() );
+
     assert( _trace_blocked_cubes[ k() ].empty() );
 
     for ( int i = 1; i < k(); ++i )
@@ -272,7 +276,7 @@ bool pdr::propagate()
 
 void pdr::refresh_solver()
 {
-    trace( "Refreshing the solver (k = {})", k() );
+    trace( "Refreshing the solver after {} queries", _queries );
 
     assert( _system );
 

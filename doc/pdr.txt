@@ -347,7 +347,7 @@ down( c : clause, i : int, level : int, req : set[ literal ] )
 
         # Griggio has here simply "pick any literal"
         l = literals( c ).set_minus( literals( d ) ).first()
-        d.insert( d )
+        d.insert( l )
 
         sat_constrain( d )
 

@@ -10,6 +10,9 @@
 #include <iostream>
 #include <map>
 
+// TODO: Delete
+#include "engine/alt_pdr.hpp"
+
 using namespace geyser;
 
 namespace
@@ -23,6 +26,8 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
         return std::make_unique< bmc >( opts, store );
     if ( name == "pdr" )
         return std::make_unique< pdr::pdr >( opts, store );
+    if ( name == "alt_pdr" )
+        return std::make_unique< alt_pdr::pdr >( opts, store );
 
     return nullptr;
 }

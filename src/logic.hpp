@@ -139,6 +139,7 @@ using valuation = std::vector< literal >;
 
 class variable_store
 {
+    // TODO: Do we even need the names? Probably not, so remove.
     // Maps a variable identifier (a positive integer) to its name.
     std::vector< std::string > _names;
 

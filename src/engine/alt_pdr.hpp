@@ -219,15 +219,10 @@ class pdr : public engine
     {
         assert( po.level() >= 1 );
 
-        // TODO: Try replacing this auxiliary activation literal with constrain().
-        const auto act = literal{ _store->make() };
-
         // -s
-        _solver->add( ( !act ).value() );
         for ( const auto lit : po.state_vars_cube().literals() )
-            _solver->add( ( !lit ).value() );
-        _solver->add( 0 );
-        _solver->assume( act.value() );
+            _solver->constrain( ( !lit ).value() );
+        _solver->constrain( 0 );
 
         // R[ i - 1 ]
         assume_trace_from( po.level() - 1 );
@@ -244,15 +239,10 @@ class pdr : public engine
             const auto ins = get_model( _system->input_vars() );
             auto p = get_model( _system->state_vars() );
 
-            // TODO: Try replacing this auxiliary activation literal with constrain().
-            const auto gen_act = literal{ _store->make() };
-
             // -s'
-            _solver->add( ( !gen_act ).value() );
             for ( const auto lit : po.state_vars_cube().literals() )
-                _solver->add( prime_literal( !lit ).value() );
-            _solver->add( 0 );
-            _solver->assume( gen_act.value() );
+                _solver->constrain( prime_literal( !lit ).value() );
+            _solver->constrain( 0 );
 
             // T
             _solver->assume( _transition_activator.value() );
@@ -274,11 +264,6 @@ class pdr : public engine
             for ( const auto lit : p.literals() )
                 if ( _solver->failed( lit.value() ) )
                     res_lits.emplace_back( lit );
-
-            _solver->add( ( !act ).value() );
-            _solver->add( 0 );
-            _solver->add( ( !gen_act ).value() );
-            _solver->add( 0 );
 
             return { false, proof_obligation{ po.level() - 1, cube{ std::move( res_lits ) } } };
         }
@@ -309,9 +294,6 @@ class pdr : public engine
                 if ( !intersects_initial_states( cube{ shorter } ) )
                     res_lits = shorter;
             }
-
-            _solver->add( ( !act ).value() );
-            _solver->add( 0 );
 
             //return { true, proof_obligation{ j + 1, cube{ res_lits } } };
             return { true, proof_obligation{ std::min( j + 1, depth() ), cube{ res_lits } } };
@@ -388,7 +370,6 @@ class pdr : public engine
             {
                 auto gen_po = generalize( next_po );
 
-                // TODO: Not < depth() or something?
                 while ( gen_po.level() <= depth() )
                 {
                     const auto next = proof_obligation{ gen_po.level() + 1, gen_po.state_vars_cube() };

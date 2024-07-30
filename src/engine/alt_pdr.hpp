@@ -143,8 +143,6 @@ class pdr : public engine
 
     void assume_trace_from( std::size_t start )
     {
-        assert( start <= depth() );
-
         for ( std::size_t i = start; i <= depth(); ++i )
             _solver->assume( _trace_activators[ i ].value() );
     }
@@ -170,14 +168,17 @@ class pdr : public engine
 
     bool is_already_blocked( const proof_obligation& po )
     {
-        // TODO: Add subsumption check
+        for ( std::size_t i = po.level(); i <= depth(); ++i )
+            for ( const auto& c : _trace_blocked_cubes[ i ] )
+                if ( c.subsumes( po.state_vars_cube() ) )
+                    return true;
 
         assume_trace_from( po.level() );
 
         for ( const auto lit : po.state_vars_cube().literals() )
             _solver->assume( lit.value() );
 
-        return _solver->solve() == CaDiCaL::UNSATISFIED;
+        return _solver->solve() == CaDiCaL::UNSATISFIABLE;
     }
 
     bool intersects_initial_states( const cube& c ) // NOLINT
@@ -286,8 +287,13 @@ class pdr : public engine
             std::size_t j = depth();
 
             for ( std::size_t i = po.level() - 1; i <= depth(); ++i )
+            {
                 if ( _solver->failed( _trace_activators[ i ].value() ) )
+                {
                     j = i;
+                    break;
+                }
+            }
 
             const auto all_lits = po.state_vars_cube().literals();
             auto res_lits = all_lits;
@@ -307,7 +313,8 @@ class pdr : public engine
             _solver->add( ( !act ).value() );
             _solver->add( 0 );
 
-            return { true, proof_obligation{ j + 1, cube{ res_lits } } };
+            //return { true, proof_obligation{ j + 1, cube{ res_lits } } };
+            return { true, proof_obligation{ std::min( j + 1, depth() ), cube{ res_lits } } };
         }
     }
 

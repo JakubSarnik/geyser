@@ -295,7 +295,6 @@ class pdr : public engine
                     res_lits = shorter;
             }
 
-            //return { true, proof_obligation{ j + 1, cube{ res_lits } } };
             return { true, proof_obligation{ std::min( j + 1, depth() ), cube{ res_lits } } };
         }
     }

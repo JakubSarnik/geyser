@@ -106,8 +106,6 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
 // the last relative inductive check.
 cti_handle pdr::get_predecessor( const proof_obligation& po )
 {
-    // TODO: Try making this into the loop again.
-
     const auto& s = _ctis.get( po.handle() ).state_vars();
     auto ins = get_model( _system->input_vars() );
     auto p = get_model( _system->state_vars() );
@@ -149,7 +147,8 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
         }
     }
 
-    int res_level = std::min( j + 1, depth() );
+    //int res_level = std::min( j + 1, depth() );
+    int res_level = j + 1;
 
     auto all_lits = _ctis.get( po.handle() ).state_vars().literals();
     auto res_lits = all_lits;
@@ -160,16 +159,10 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
             continue;
 
         // TODO: Optimize erasing by a single swap?
-//        res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
-//
-//        if ( intersects_initial_states( res_lits ) )
-//            res_lits.push_back( lit );
+        res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
 
-        auto shorter = res_lits;
-        shorter.erase( std::remove( shorter.begin(), shorter.end(), lit ), shorter.end() );
-
-        if ( !intersects_initial_states( shorter ) )
-            res_lits = shorter;
+        if ( intersects_initial_states( res_lits ) )
+            res_lits.push_back( lit );
     }
 
     all_lits = res_lits;

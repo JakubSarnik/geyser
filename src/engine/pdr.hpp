@@ -279,7 +279,7 @@ class pdr : public engine
 
     // How many solver queries to make before refreshing the solver to remove
     // all the accumulated subsumed clauses.
-    constexpr static int solver_refresh_rate = 50000;
+    constexpr static int solver_refresh_rate = 5000000;
     int _queries = 0;
 
     cti_pool _ctis;

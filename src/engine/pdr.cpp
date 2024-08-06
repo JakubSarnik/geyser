@@ -90,7 +90,7 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
             trace( "{}: {}", i, c.format() );
             add_blocked_at( c, i );
 
-            if ( po.level() <= depth() )
+            if ( po.level() < depth() )
                 min_queue.emplace( po.handle(), po.level() + 1 );
         }
         else
@@ -290,7 +290,7 @@ void pdr::add_blocked_at( const cube& c, int level, int start_from /* = 1*/ )
 
     const auto k = std::min( level, depth() );
 
-    for ( int d = 1; d <= k; ++d )
+    for ( int d = start_from; d <= k; ++d )
     {
         auto& cubes = _trace_blocked_cubes[ d ];
 

@@ -159,7 +159,6 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
         if ( !_solver->failed( lit.value() ) )
             continue;
 
-        // TODO: Optimize erasing by a single swap?
         res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
 
         if ( intersects_initial_states( res_lits ) )
@@ -170,7 +169,6 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
     for ( const auto lit : all_lits )
     {
-        // TODO: Optimize erasing by a single swap?
         res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
 
         if ( intersects_initial_states( res_lits ) || !is_relative_inductive( res_lits, res_level ) )

@@ -55,7 +55,8 @@ std::optional< cti_handle > pdr::get_error_cti()
          .assume( activators_from( depth() ) )
          .assume( _error_activator )
          .is_sat() )
-        return _ctis.make( get_model( _system->state_vars() ), get_model( _system->input_vars() ) );
+        return _ctis.make( cube{ get_model( _system->state_vars() ) },
+                           cube{ get_model( _system->input_vars() ) } );
 
     return {};
 }
@@ -114,19 +115,19 @@ cti_handle pdr::get_predecessor( const proof_obligation& po )
     const auto sat = with_solver()
             .constrain_not_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
             .assume( _transition_activator )
-            .assume( ins.literals() )
-            .assume( p.literals() )
+            .assume( ins )
+            .assume( p )
             .is_sat();
 
     assert( !sat );
 
     auto res = std::vector< literal >{};
 
-    for ( const auto lit : p.literals() )
+    for ( const auto lit : p )
         if ( _solver->failed( lit.value() ) )
             res.emplace_back( lit );
 
-    return _ctis.make( cube{ std::move( res ) }, std::move( ins ), po.handle() );
+    return _ctis.make( cube{ std::move( res ) }, cube{ std::move( ins ) }, po.handle() );
 }
 
 // Proof obligation po was blocked, i.e. it has no predecessors at the previous

@@ -315,15 +315,15 @@ class pdr : public engine
         return _solver->val( var.id() ) > 0;
     }
 
-    cube get_model( variable_range range )
+    std::vector< literal > get_model( variable_range range )
     {
-        auto val = valuation{};
+        auto val = std::vector< literal >{};
         val.reserve( range.size() );
 
         for ( const auto var : range )
             val.emplace_back( var, !is_true( var ) );
 
-        return cube{ val };
+        return val;
     }
 
     [[nodiscard]] int depth() const

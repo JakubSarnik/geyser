@@ -39,40 +39,22 @@ TEST_CASE( "Cube construction works" )
 
     SECTION( "From an empty vector" )
     {
-        REQUIRE( to_nums( ordered_cube{ {} }.literals() )
+        REQUIRE( to_nums( cube{ {} }.literals() )
                  == std::vector< int >{} );
     }
 
-    SECTION( "From an unsorted vector" )
+    SECTION( "From a nonempty vector" )
     {
-        REQUIRE( to_nums( ordered_cube{ { x, z } }.literals() )
+        REQUIRE( to_nums( cube{ { x, z } }.literals() )
                  == std::vector{ 1, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { !x, z } }.literals() )
+        REQUIRE( to_nums( cube{ { !x, z } }.literals() )
                  == std::vector{ -1, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { x, !z } }.literals() )
-                 == std::vector{ -3, 1 } );
-        REQUIRE( to_nums( ordered_cube{ { x, y, z } }.literals() )
+        REQUIRE( to_nums( cube{ { x, y, z } }.literals() )
             == std::vector{ 1, 2, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { x, !y, z } }.literals() )
-                 == std::vector{ -2, 1, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { !x, !y, !z } }.literals() )
-                 == std::vector{ -3, -2, -1 } );
-    }
-
-    SECTION( "From a sorted vector" )
-    {
-        REQUIRE( to_nums( ordered_cube{ { x, z }, sorted_tag }.literals() )
-                 == std::vector{ 1, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { !x, z }, sorted_tag }.literals() )
-                 == std::vector{ -1, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { !z, x }, sorted_tag }.literals() )
-                 == std::vector{ -3, 1 } );
-        REQUIRE( to_nums( ordered_cube{ { x, y, z }, sorted_tag }.literals() )
-                 == std::vector{ 1, 2, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { !y, x, z }, sorted_tag }.literals() )
-                 == std::vector{ -2, 1, 3 } );
-        REQUIRE( to_nums( ordered_cube{ { !z, !y, !x }, sorted_tag }.literals() )
-                 == std::vector{ -3, -2, -1 } );
+        REQUIRE( to_nums( cube{ { x, !y, z } }.literals() )
+                 == std::vector{ 1, -2, 3 } );
+        REQUIRE( to_nums( cube{ { !x, !y, !z } }.literals() )
+                 == std::vector{ -1, -2, -3 } );
     }
 }
 
@@ -80,7 +62,7 @@ TEST_CASE( "Cube negation works" )
 {
     SECTION( "Empty cube" )
     {
-        REQUIRE( to_nums( ordered_cube{ {} }.negate() ) == std::vector{ 0 } );
+        REQUIRE( to_nums( cube{ {} }.negate() ) == std::vector{ 0 } );
     }
 
     SECTION( "Non-empty cube" )
@@ -89,18 +71,18 @@ TEST_CASE( "Cube negation works" )
         auto b = literal{ variable{ 2 } };
         auto c = literal{ variable{ 3 } };
 
-        REQUIRE( to_nums( ordered_cube{ { a } }.negate() )
+        REQUIRE( to_nums( cube{ { a } }.negate() )
                  == std::vector{ -1, 0 } );
-        REQUIRE( to_nums( ordered_cube{ { !a } }.negate() )
+        REQUIRE( to_nums( cube{ { !a } }.negate() )
                  == std::vector{ 1, 0 } );
-        REQUIRE( to_nums( ordered_cube{ { a, !b, c } }.negate() )
-                == std::vector{ 2, -1, -3, 0 } );
-        REQUIRE( to_nums( ordered_cube{ { !a, !b, c } }.negate() )
-                 == std::vector{ 2, 1, -3, 0 } );
-        REQUIRE( to_nums( ordered_cube{ { a, b, c } }.negate() )
+        REQUIRE( to_nums( cube{ { a, !b, c } }.negate() )
+                == std::vector{ -1, 2, -3, 0 } );
+        REQUIRE( to_nums( cube{ { !a, !b, c } }.negate() )
+                 == std::vector{ 1, 2, -3, 0 } );
+        REQUIRE( to_nums( cube{ { a, b, c } }.negate() )
                  == std::vector{ -1, -2, -3, 0 } );
-        REQUIRE( to_nums( ordered_cube{ { !a, !b, !c } }.negate() )
-                 == std::vector{ 3, 2, 1, 0 } );
+        REQUIRE( to_nums( cube{ { !a, !b, !c } }.negate() )
+                 == std::vector{ 1, 2, 3, 0 } );
     }
 }
 
@@ -113,7 +95,7 @@ TEST_CASE( "Cube subsumption works" )
         for ( auto i : vals )
             v.emplace_back( variable{ std::abs( i ) }, i < 0 );
 
-        return ordered_cube( v );
+        return cube( v );
     };
 
     auto c0 = mk_cube( {} );
@@ -158,7 +140,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Empty cube" )
     {
-        const auto c = ordered_cube{ {} };
+        const auto c = cube{ {} };
 
         REQUIRE( !c.find( v1 ).has_value() );
         REQUIRE( !c.find( v2 ).has_value() );
@@ -167,7 +149,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Single positive literal" )
     {
-        const auto c = ordered_cube{ { y } };
+        const auto c = cube{ { y } };
 
         REQUIRE( !c.find( v1 ).has_value() );
         REQUIRE( c.find( v2 ).has_value() );
@@ -177,7 +159,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Single negative literal" )
     {
-        const auto c = ordered_cube{ { !y } };
+        const auto c = cube{ { !y } };
 
         REQUIRE( !c.find( v1 ).has_value() );
         REQUIRE( c.find( v2 ).has_value() );
@@ -187,7 +169,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Two literals, in order" )
     {
-        const auto c = ordered_cube{ { x, z } };
+        const auto c = cube{ { x, z } };
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
@@ -198,7 +180,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Two literals, out of order" )
     {
-        const auto c = ordered_cube{ { z, x } };
+        const auto c = cube{ { z, x } };
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
@@ -209,7 +191,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Three literals, all positive" )
     {
-        const auto c = ordered_cube{ { x, y, z } };
+        const auto c = cube{ { x, y, z } };
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
@@ -221,7 +203,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Three literals, all negative" )
     {
-        const auto c = ordered_cube{ { !x, !y, !z } };
+        const auto c = cube{ { !x, !y, !z } };
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == !x );
@@ -233,7 +215,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Three literals, mixed 1" )
     {
-        const auto c = ordered_cube{ { !x, y, !z } };
+        const auto c = cube{ { !x, y, !z } };
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == !x );
@@ -245,7 +227,7 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
     SECTION( "Three literals, mixed 2" )
     {
-        const auto c = ordered_cube{ { x, y, !z } };
+        const auto c = cube{ { x, y, !z } };
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
@@ -258,15 +240,15 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
 
 TEST_CASE( "CTI pool works" )
 {
-    const auto c0 = ordered_cube{ {} };
-    const auto c1 = ordered_cube{ to_literals( { 1, 2, 3 } ) };
-    const auto c2 = ordered_cube{ to_literals( { 1, -2, 3 } ) };
-    const auto c3 = ordered_cube{ to_literals( { -10, 12 } ) };
+    const auto c0 = cube{ {} };
+    const auto c1 = cube{ to_literals( { 1, 2, 3 } ) };
+    const auto c2 = cube{ to_literals( { 1, -2, 3 } ) };
+    const auto c3 = cube{ to_literals( { -10, 12 } ) };
 
     auto pool = cti_pool{};
 
     const auto check_handle = [ & ]( cti_handle h,
-            const ordered_cube& s, const ordered_cube& i, std::optional< cti_handle > succ )
+            const cube& s, const cube& i, std::optional< cti_handle > succ )
     {
         REQUIRE( pool.get( h ).state_vars() == s );
         REQUIRE( pool.get( h ).input_vars() == i );
@@ -342,7 +324,7 @@ TEST_CASE( "Proof obligations are ordered by level" )
 {
     auto pool = cti_pool{};
 
-    const auto c = ordered_cube{ {} };
+    const auto c = cube{ {} };
 
     const auto h1 = pool.make( c, c, {} );
     const auto h2 = pool.make( c, c, {} );

@@ -297,8 +297,11 @@ class pdr : public engine
         return query_builder{ *_solver };
     }
 
-    // TODO: This is present also in the BMC engine, decompose by moving into
-    //       base? Also is_true below.
+    // This is present also in the bmc engine, but putting it as a common code
+    // to the base class might not be a good idea, since other engines might
+    // have somewhat different requirements (for example several different
+    // solvers.)
+    // TODO: Consider a solver abstraction?
     void assert_formula( const cnf_formula& formula )
     {
         assert( _solver );

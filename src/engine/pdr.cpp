@@ -167,7 +167,7 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
             res_lits.emplace_back( lit );
     }
 
-    const auto res_cube = cube{ res_lits };
+    const auto res_cube = cube{ std::move( res_lits ) };
 
     while ( res_level <= depth() )
     {

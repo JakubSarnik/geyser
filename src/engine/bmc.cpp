@@ -42,13 +42,13 @@ void bmc::refresh_solver( int bound )
     assert( bound >= 0 );
     assert( _system );
 
-    _solver = std::make_unique< CaDiCaL::Solver >();
+    _solver.reset();
     _activators.clear();
 
-    assert_formula( _system->init() );
+    _solver.assert_formula( _system->init() );
 
     for ( auto i = 0; i < bound; ++i )
-        assert_formula( make_trans( i ) );
+        _solver.assert_formula( make_trans( i ) );
 }
 
 // Check the satisfiability of
@@ -58,27 +58,28 @@ std::optional< counterexample > bmc::check_for( int step )
     trace( "BMC entering step {}", step );
 
     assert( step >= 0 );
-    assert( _solver );
 
     if ( step > 0 )
-        assert_formula( make_trans( step - 1 ) );
+        _solver.assert_formula( make_trans( step - 1 ) );
 
-    assert_formula( make_error( step ) );
+    _solver.assert_formula( make_error( step ) );
 
     // The solver contains
     //    Error(X_i) /\ Error(X_{i + 1}) /\ ... /\ Error(X_{step - 1}),
     // for some i, which must be disabled.
 
+    // TODO: We actually only need to add the unit clause !_activators.back()
+    //       once we are finished with this SAT call. We don't need to collect
+    //       all the activation literals.
+
+    auto q = _solver.query();
+
     for ( std::size_t i = 0; i < _activators.size() - 1; ++i )
-        _solver->assume( ( !_activators[ i ] ).value() );
+        q.assume( !_activators[ i ] );
 
-    _solver->assume( _activators.back().value() );
+    q.assume( _activators.back() );
 
-    const auto res = _solver->solve();
-
-    assert( res != CaDiCaL::UNKNOWN );
-
-    if ( res == CaDiCaL::SATISFIABLE )
+    if ( q.is_sat() )
         return build_counterexample( step );
 
     return {};
@@ -97,7 +98,7 @@ counterexample bmc::build_counterexample( int step )
 
     for ( int vi = 0; vi < _system->state_vars().size(); ++vi )
         initial_state.emplace_back( _system->state_vars().nth( vi ),
-                            !is_true( _versioned_state_vars[ 0 ].nth( vi ) ) );
+                            !_solver.is_true_in_model( _versioned_state_vars[ 0 ].nth( vi ) ) );
 
     auto inputs = std::vector< valuation >( step + 1 );
 
@@ -109,7 +110,7 @@ counterexample bmc::build_counterexample( int step )
 
         for ( int vi = 0; vi < _system->input_vars().size(); ++vi )
             input.emplace_back( _system->input_vars().nth( vi ),
-                                !is_true( _versioned_input_vars[ i ].nth( vi ) ) );
+                                !_solver.is_true_in_model( _versioned_input_vars[ i ].nth( vi ) ) );
     }
 
     return counterexample{ std::move( initial_state ), std::move( inputs ) };

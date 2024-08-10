@@ -1,7 +1,7 @@
 #pragma once
 
 #include "base.hpp"
-#include "cadical.hpp"
+#include "solver.hpp"
 #include <optional>
 #include <memory>
 #include <vector>
@@ -19,7 +19,7 @@ class bmc : public engine
     // all the accumulated (and disabled) error formulas.
     constexpr static int solver_refresh_rate = 100;
 
-    std::unique_ptr< CaDiCaL::Solver > _solver;
+    solver _solver;
     const transition_system* _system = nullptr;
 
     // Each state variable x in X (the set of state variables) occurs in various
@@ -43,14 +43,6 @@ class bmc : public engine
     // formula Error(X_i).
     std::vector< literal > _activators;
 
-    void assert_formula( const cnf_formula& formula )
-    {
-        assert( _solver );
-
-        for ( const auto lit : formula.literals() )
-            _solver->add( lit.value() );
-    }
-
     void setup_versioning()
     {
         assert( _system );
@@ -58,14 +50,6 @@ class bmc : public engine
         _versioned_state_vars.push_back( _system->state_vars() );
         _versioned_input_vars.push_back( _system->input_vars() );
         _versioned_aux_vars.push_back( _system->aux_vars() );
-    }
-
-    bool is_true( variable var )
-    {
-        assert( _solver );
-        assert( ( _solver->state() & CaDiCaL::SATISFIED ) != 0 );
-
-        return _solver->val( var.id() ) > 0;
     }
 
     void refresh_solver( int bound );

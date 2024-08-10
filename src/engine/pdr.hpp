@@ -1,7 +1,7 @@
 #pragma once
 
 #include "base.hpp"
-#include "cadical.hpp"
+#include "solver.hpp"
 #include <algorithm>
 #include <memory>
 #include <vector>
@@ -187,82 +187,7 @@ public:
 
 class pdr : public engine
 {
-    class query_builder
-    {
-        CaDiCaL::Solver* _solver;
-
-    public:
-        explicit query_builder( CaDiCaL::Solver& solver ) : _solver{ &solver } {}
-
-        query_builder( const query_builder& ) = delete;
-        query_builder( query_builder&& ) = delete;
-
-        query_builder& operator=( const query_builder& ) = delete;
-        query_builder& operator=( query_builder&& ) = delete;
-
-        ~query_builder() = default;
-
-        query_builder& assume( literal l )
-        {
-            _solver->assume( l.value() );
-            return *this;
-        }
-
-        query_builder& assume( std::span< const literal > literals )
-        {
-            for ( const auto l : literals )
-                assume( l );
-
-            return *this;
-        }
-
-        query_builder& assume( std::initializer_list< literal > literals )
-        {
-            return assume( { literals.begin(), literals.end() } );
-        }
-
-        query_builder& assume_mapped( std::span< const literal > literals,
-                                      const std::regular_invocable< literal > auto& f )
-        {
-            for ( const auto l : literals )
-                assume( f( l ) );
-
-            return *this;
-        }
-
-        query_builder& constrain_not( std::span< const literal > cube )
-        {
-            for ( const auto l : cube )
-                _solver->constrain( ( !l ).value() );
-            _solver->constrain( 0 );
-
-            return *this;
-        }
-
-        query_builder& constrain_not( const cube& cube )
-        {
-            return constrain_not( cube.literals() );
-        }
-
-        query_builder& constrain_not_mapped( const cube& cube, const std::regular_invocable< literal > auto& f )
-        {
-            for ( const auto l : cube.literals() )
-                _solver->constrain( f( !l ).value() );
-            _solver->constrain( 0 );
-
-            return *this;
-        }
-
-        bool is_sat()
-        {
-            const auto res = _solver->solve();
-            assert( res != CaDiCaL::UNKNOWN );
-
-            return res == CaDiCaL::SATISFIABLE;
-        }
-    };
-
-    std::unique_ptr< CaDiCaL::Solver > _solver;
+    solver _solver;
     const transition_system* _system = nullptr;
 
     literal _transition_activator;
@@ -286,47 +211,14 @@ class pdr : public engine
 
     void refresh_solver();
 
-    query_builder with_solver()
+    solver::query_builder with_solver()
     {
         if ( _queries % solver_refresh_rate == 0 )
             refresh_solver();
 
         ++_queries;
 
-        assert( _solver );
-        return query_builder{ *_solver };
-    }
-
-    // This is present also in the bmc engine, but putting it as a common code
-    // to the base class might not be a good idea, since other engines might
-    // have somewhat different requirements (for example several different
-    // solvers.)
-    // TODO: Consider a solver abstraction?
-    void assert_formula( const cnf_formula& formula )
-    {
-        assert( _solver );
-
-        for ( const auto lit : formula.literals() )
-            _solver->add( lit.value() );
-    }
-
-    bool is_true( variable var )
-    {
-        assert( _solver );
-        assert( ( _solver->state() & CaDiCaL::SATISFIED ) != 0 );
-
-        return _solver->val( var.id() ) > 0;
-    }
-
-    std::vector< literal > get_model( variable_range range )
-    {
-        auto val = std::vector< literal >{};
-        val.reserve( range.size() );
-
-        for ( const auto var : range )
-            val.emplace_back( var, !is_true( var ) );
-
-        return val;
+        return _solver.query();
     }
 
     [[nodiscard]] int depth() const

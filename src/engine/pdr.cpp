@@ -55,8 +55,8 @@ std::optional< cti_handle > pdr::get_error_cti()
          .assume( activators_from( depth() ) )
          .assume( _error_activator )
          .is_sat() )
-        return _ctis.make( cube{ get_model( _system->state_vars() ) },
-                           cube{ get_model( _system->input_vars() ) } );
+        return _ctis.make( cube{ _solver.get_model( _system->state_vars() ) },
+                           cube{ _solver.get_model( _system->input_vars() ) } );
 
     return {};
 }
@@ -107,9 +107,9 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
 // the last relative inductive check.
 cti_handle pdr::get_predecessor( const proof_obligation& po )
 {
-    const auto& s = _ctis.get( po.handle() ).state_vars();
-    auto ins = get_model( _system->input_vars() );
-    auto p = get_model( _system->state_vars() );
+    const auto& s = _ctis.get( po.handle() ).state_vars().literals();
+    auto ins = _solver.get_model( _system->input_vars() );
+    auto p = _solver.get_model( _system->state_vars() );
 
     [[maybe_unused]]
     const auto sat = with_solver()
@@ -121,13 +121,7 @@ cti_handle pdr::get_predecessor( const proof_obligation& po )
 
     assert( !sat );
 
-    auto res = std::vector< literal >{};
-
-    for ( const auto lit : p )
-        if ( _solver->failed( lit.value() ) )
-            res.emplace_back( lit );
-
-    return _ctis.make( cube{ std::move( res ) }, cube{ std::move( ins ) }, po.handle() );
+    return _ctis.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
 }
 
 // Proof obligation po was blocked, i.e. it has no predecessors at the previous
@@ -135,13 +129,11 @@ cti_handle pdr::get_predecessor( const proof_obligation& po )
 // to shrink it and possibly move it further along the trace.
 std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 {
-    assert( _solver->state() == CaDiCaL::UNSATISFIED );
-
     int j = depth();
 
     for ( int i = po.level() - 1; i <= depth(); ++i )
     {
-        if ( _solver->failed( _trace_activators[ i ].value() ) )
+        if ( _solver.is_in_core( _trace_activators[ i ] ) )
         {
             j = i;
             break;
@@ -156,7 +148,7 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
     for ( const auto lit : all_lits )
     {
-        if ( !_solver->failed( lit.value() ) )
+        if ( !_solver.is_in_core( lit ) )
             continue;
 
         res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
@@ -308,7 +300,7 @@ void pdr::add_blocked_at( const cube& c, int level, int start_from /* = 1*/ )
     assert( k < _trace_activators.size() );
 
     _trace_blocked_cubes[ k ].emplace_back( c );
-    assert_formula( c.negate().activate( _trace_activators[ k ].var() ) );
+    _solver.assert_formula( c.negate().activate( _trace_activators[ k ].var() ) );
 }
 
 // Returns true if the system has been proven safe by finding an invariant.
@@ -344,16 +336,16 @@ void pdr::refresh_solver()
 
     assert( _system );
 
-    _solver = std::make_unique< CaDiCaL::Solver >();
+    _solver.reset();
     _queries = 0;
 
-    assert_formula( _activated_init );
-    assert_formula( _activated_trans );
-    assert_formula( _activated_error );
+    _solver.assert_formula( _activated_init );
+    _solver.assert_formula( _activated_trans );
+    _solver.assert_formula( _activated_error );
 
     for ( const auto& [ cubes, act ] : std::views::zip( _trace_blocked_cubes, _trace_activators ) )
         for ( const auto& cube : cubes )
-            assert_formula( cube.negate().activate( act.var() ) );
+            _solver.assert_formula( cube.negate().activate( act.var() ) );
 }
 
 literal pdr::prime_literal( literal lit ) const

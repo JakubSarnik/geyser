@@ -99,8 +99,6 @@ public:
     friend auto operator<=>( cti_handle, cti_handle ) = default;
 };
 
-// TODO: Investigate whether we want to remove states in the middle
-//       of the pool and keep a freelist/used flag!.
 class cti_entry
 {
     friend class cti_pool;

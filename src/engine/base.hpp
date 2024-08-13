@@ -42,7 +42,7 @@ protected:
     template< class... Args >
     void trace( std::format_string<Args...> fmt, Args&&... args ) const
     {
-        if ( _opts->verbosity == verbosity::loud )
+        if ( _opts->verbosity == verbosity_level::loud )
             std::println( fmt, std::forward< Args >( args )... );
     }
 

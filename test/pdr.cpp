@@ -349,7 +349,7 @@ TEST_CASE( "Proof obligations are ordered by level" )
 TEST_CASE( "PDR works on a simple system" )
 {
     auto store = variable_store{};
-    const auto opts = options{ {}, "pdr", verbosity::silent, {} };
+    const auto opts = options{ {}, "pdr", verbosity_level::silent, {} };
 
     auto engine = geyser::pdr::pdr{ opts, store };
 

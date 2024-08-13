@@ -78,7 +78,7 @@ TEST_CASE( "Valid, non-verbose, bounded file input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( opts->input_file == "input.aig" );
-        REQUIRE( opts->verbosity == verbosity::silent );
+        REQUIRE( opts->verbosity == verbosity_level::silent );
     }
 
     SECTION( "Bound before engine" )
@@ -90,7 +90,7 @@ TEST_CASE( "Valid, non-verbose, bounded file input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( opts->input_file == "input.aig" );
-        REQUIRE( opts->verbosity == verbosity::silent );
+        REQUIRE( opts->verbosity == verbosity_level::silent );
     }
 }
 
@@ -105,7 +105,7 @@ TEST_CASE( "Valid, verbose, bounded file input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( opts->input_file == "input.aig" );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 
     SECTION( "Bound, engine, verbosity" )
@@ -117,7 +117,7 @@ TEST_CASE( "Valid, verbose, bounded file input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( opts->input_file == "input.aig" );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 
     SECTION( "Verbosity, bound, engine" )
@@ -129,7 +129,7 @@ TEST_CASE( "Valid, verbose, bounded file input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( opts->input_file == "input.aig" );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 }
 
@@ -144,7 +144,7 @@ TEST_CASE( "Valid, verbose, bounded stdin input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( !opts->input_file.has_value() );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 
     SECTION( "Bound, engine, verbosity" )
@@ -156,7 +156,7 @@ TEST_CASE( "Valid, verbose, bounded stdin input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( !opts->input_file.has_value() );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 
     SECTION( "Verbosity, bound, engine" )
@@ -168,7 +168,7 @@ TEST_CASE( "Valid, verbose, bounded stdin input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( opts->bound == 2 );
         REQUIRE( !opts->input_file.has_value() );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 }
 
@@ -183,7 +183,7 @@ TEST_CASE( "Valid, verbose, unbounded stdin input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( !opts->bound.has_value() );
         REQUIRE( !opts->input_file.has_value() );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 
     SECTION( "Verbosity, engine" )
@@ -195,7 +195,7 @@ TEST_CASE( "Valid, verbose, unbounded stdin input" )
         REQUIRE( opts->engine_name == "bmc" );
         REQUIRE( !opts->bound.has_value() );
         REQUIRE( !opts->input_file.has_value() );
-        REQUIRE( opts->verbosity == verbosity::loud );
+        REQUIRE( opts->verbosity == verbosity_level::loud );
     }
 }
 

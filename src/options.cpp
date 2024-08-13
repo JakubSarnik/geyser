@@ -23,7 +23,7 @@ std::expected< options, std::string > parse_cli( int argc, char const* const* ar
     auto bound = std::optional< int >{};
     auto engine_name = std::optional< std::string >{};
     auto input_file = std::optional< std::string >{};
-    auto verbosity = verbosity::silent;
+    auto verbosity = verbosity_level::silent;
 
     for ( int i = 1; i < argc; ++i )
     {
@@ -61,7 +61,7 @@ std::expected< options, std::string > parse_cli( int argc, char const* const* ar
             case state::anything:
             {
                 if ( arg == "-v" || arg == "--verbose" )
-                    verbosity = verbosity::loud;
+                    verbosity = verbosity_level::loud;
                 else if ( arg == "-k" || arg == "-b" || arg == "--bound" )
                     state = state::expecting_bound;
                 else if ( arg == "-e" || arg == "--engine" )

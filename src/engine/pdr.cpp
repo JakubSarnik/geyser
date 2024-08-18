@@ -320,7 +320,7 @@ bool pdr::propagate()
             if ( is_relative_inductive( c.literals(), i + 1 ) )
                 add_blocked_at( c, i + 1, i );
 
-        if ( cubes.empty() )
+        if ( _trace_blocked_cubes[ i ].empty() )
             return true;
     }
 

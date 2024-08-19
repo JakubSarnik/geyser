@@ -11,7 +11,13 @@
 namespace geyser::pdr
 {
 
-// TODO: Check whether keeping cubes ordered helps with performance (see subsumption check)
+// TODO: Check whether keeping cubes ordered helps with performance (see the
+//       subsumption check). Alternatively, consider keeping all variables in
+//       each cube (in the order of state variables in the system) but with
+//       literal 0 if the given variable is not present. This would make
+//       both subsumption (and potentially initial state intersection) checks
+//       efficient while not messing with the order (but it would require some
+//       logic to efficiently handle cube assumptions and constraints).
 class cube
 {
     std::vector< literal > _literals;

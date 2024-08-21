@@ -1,0 +1,55 @@
+Our implementation of CAR mostly follows the paper Accelerate safety model
+checking based on complementary approximate reachability (Zhang et al.). We
+have also used the code of SimpleCAR, the tool by the authors of the
+aforementioned paper, as an additional source to help us understand the
+algorithm. We implement only the forward direction of CAR with PDR-like
+propagation, partial model and MUC heuristics, but without the dead state
+elimination heuristics.
+
+The reason for not implementing backward CAR is that even though pure backward
+CAR is (according to authors' evaluation) more efficient than pure forward CAR,
+the difference more or less disappears once the heuristics are present, and
+partial model heuristic doesn't work in the backward mode (since the reversed
+transition relation is no longer functional in inputs and state variables).
+Further, the dead state heuristic seems to bring modest performance gains and
+as such is, in our opinion, not worth the problems with implementation.
+
+Note that we make one large theoretical change, a similar to the one made by
+Een et al. in regard to IC3: instead of asserting that each frame of the trace
+contains only safe states and looking at transitions from the last frame to
+the set of "eventually unsafe" states (i.e. members of the underapproximate
+sequence B), we allow the last frame to have a non-empty intersection with B
+and look at potential counterexample path starting from a state in this
+intersection.
+
+Given a transition system S = <X, Y, I(X), T(X, Y, X')> and an error formula
+E(X, Y), we store a trace
+
+  F_0, F_1, ..., F_k
+
+where each F_i is a set of cubes blocked at step i. Unlike PDR, this trace is
+not cumulative, so if c is in F_i, we only know that no state described by c
+is reachable in exactly i steps from I. We store F in a vector, and we further
+store activation variables for each frame in vector Act. Similarly to PDR, the
+solver is informed about the contents of the trace so that adding c to F_i also
+adds the clause -c activated by Act_i to the solver. Asserting F_i in the
+solver thus amounts to assuming Act_i.
+
+As in PDR, the first frame is semantically equal to the set of initial states.
+Implementation-wise, F_0 exists only virtually and is kept empty throughout
+the algorithm (i.e. no initial states are blocked, because we know they are
+reachable - in 0 steps).
+
+We similarly store a cotrace
+
+  B_0, B_1, ..., B_l
+
+where each B_i is a set of cubes with the property that each state described by
+c in B_i has a path of length precisely i to some bad state b in B_0 = E. More
+precisely, every state s in B_0 has the property that there exist inputs y with
+E(s, y) true (B_0 are precisely the "bad states" as describable by Aiger). Note
+that each B_i is only an underapproximation of such "i-generalized bad states",
+except for B_0, which contains precisely the bad states. However, the
+implementation doesn't actually store B_0 explicitly (there can, of course, be
+extremely many bad states), but instead stores B_0 lazily, adding a cube there
+whenever we find out that F_k /\ E is satisfiable.

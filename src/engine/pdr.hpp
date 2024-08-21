@@ -11,6 +11,8 @@
 namespace geyser::pdr
 {
 
+// TODO: Consider adding a literal ordering heuristic (see e.g. IC3Ref).
+
 // TODO: Check whether keeping cubes ordered helps with performance (see the
 //       subsumption check). Alternatively, consider keeping all variables in
 //       each cube (in the order of state variables in the system) but with

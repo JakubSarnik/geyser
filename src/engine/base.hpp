@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 #include <variant>
-#include <print>
+#include <format>
+#include <iostream>
 
 namespace geyser
 {
@@ -43,7 +44,7 @@ protected:
     void trace( std::format_string<Args...> fmt, Args&&... args ) const
     {
         if ( _opts->verbosity == verbosity_level::loud )
-            std::println( fmt, std::forward< Args >( args )... );
+            std::cout << std::format( fmt, std::forward< Args >( args )... ) << "\n";
     }
 
 public:

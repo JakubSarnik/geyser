@@ -10,7 +10,8 @@ namespace geyser
 enum class verbosity_level
 {
     silent,
-    loud
+    loud,
+    debug
 };
 
 struct options

@@ -199,6 +199,45 @@ TEST_CASE( "Valid, verbose, unbounded stdin input" )
     }
 }
 
+TEST_CASE( "Debug-level verbosity" )
+{
+    SECTION( "Verbosity first" )
+    {
+        auto cli = std::vector{ "", "--debug", "-e", "bmc", "-k", "2", "input.aig" };
+        auto opts = parse_cli( int( cli.size() ), cli.data() );
+
+        REQUIRE( opts.has_value() );
+        REQUIRE( opts->engine_name == "bmc" );
+        REQUIRE( opts->bound == 2 );
+        REQUIRE( opts->input_file == "input.aig" );
+        REQUIRE( opts->verbosity == verbosity_level::debug );
+    }
+
+    SECTION( "Verbosity in the middle" )
+    {
+        auto cli = std::vector{ "", "-e", "bmc", "--debug", "-k", "2", "input.aig" };
+        auto opts = parse_cli( int( cli.size() ), cli.data() );
+
+        REQUIRE( opts.has_value() );
+        REQUIRE( opts->engine_name == "bmc" );
+        REQUIRE( opts->bound == 2 );
+        REQUIRE( opts->input_file == "input.aig" );
+        REQUIRE( opts->verbosity == verbosity_level::debug );
+    }
+
+    SECTION( "Verbosity last" )
+    {
+        auto cli = std::vector{ "", "-e", "bmc", "-k", "2", "--debug", "input.aig" };
+        auto opts = parse_cli( int( cli.size() ), cli.data() );
+
+        REQUIRE( opts.has_value() );
+        REQUIRE( opts->engine_name == "bmc" );
+        REQUIRE( opts->bound == 2 );
+        REQUIRE( opts->input_file == "input.aig" );
+        REQUIRE( opts->verbosity == verbosity_level::debug );
+    }
+}
+
 TEST_CASE( "Rejected arguments after input file" )
 {
     SECTION( "Verbosity" )

@@ -62,6 +62,8 @@ std::expected< options, std::string > parse_cli( int argc, char const* const* ar
             {
                 if ( arg == "-v" || arg == "--verbose" )
                     verbosity = verbosity_level::loud;
+                else if ( arg == "--debug" )
+                    verbosity = verbosity_level::debug;
                 else if ( arg == "-k" || arg == "-b" || arg == "--bound" )
                     state = state::expecting_bound;
                 else if ( arg == "-e" || arg == "--engine" )

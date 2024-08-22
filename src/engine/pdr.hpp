@@ -273,6 +273,8 @@ class pdr : public engine
     [[maybe_unused]] bool is_state_cube( std::span< const literal > literals ) const;
     [[maybe_unused]] bool is_state_cube( const cube& cube ) const;
 
+    void log_trace_content() const;
+
 public:
     pdr( const options& opts, variable_store& store )
         : engine( opts, store ), _transition_activator{ _store->make( "ActT" ) },

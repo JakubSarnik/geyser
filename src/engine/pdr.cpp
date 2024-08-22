@@ -1,6 +1,7 @@
 #include "pdr.hpp"
 #include <queue>
 #include <ranges>
+#include <string>
 
 namespace geyser::pdr
 {
@@ -87,7 +88,7 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
         {
             const auto [ c, i ] = generalize_inductive( po );
 
-            trace( "{}: {}", i, c.format() );
+            log_line_debug( "{}: {}", i, c.format() );
             add_blocked_at( c, i );
 
             if ( po.level() < depth() )
@@ -182,7 +183,7 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
 counterexample pdr::build_counterexample( cti_handle initial )
 {
-    trace( "Found a counterexample at k = {}", depth() );
+    log_line_loud( "Found a counterexample at k = {}", depth() );
 
     // CTI entries don't necessarily contain all the variables. If a variable
     // doesn't appear in any literal, its value is not important, so we might
@@ -306,7 +307,7 @@ void pdr::add_blocked_at( const cube& c, int level, int start_from /* = 1*/ )
 // Returns true if the system has been proven safe by finding an invariant.
 bool pdr::propagate()
 {
-    trace( "Propagating (k = {})", depth() );
+    //log_line_loud( "Propagating (k = {})", depth() );
 
     assert( _trace_blocked_cubes[ depth() ].empty() );
 
@@ -324,15 +325,17 @@ bool pdr::propagate()
             return true;
     }
 
-    for ( int i = 1; i <= depth(); ++i )
-        trace( "  F[ {} ]: {} cubes", i, _trace_blocked_cubes[ i ].size() );
+    log_trace_content();
+
+    //for ( int i = 1; i <= depth(); ++i )
+    //    log_line_loud( "  F[ {} ]: {} cubes", i, _trace_blocked_cubes[ i ].size() );
 
     return false;
 }
 
 void pdr::refresh_solver()
 {
-    trace( "Refreshing the solver after {} queries", _queries );
+    log_line_loud( "Refreshing the solver after {} queries", _queries );
 
     assert( _system );
 
@@ -372,6 +375,16 @@ bool pdr::is_state_cube( std::span< const literal > literals ) const
 bool pdr::is_state_cube( const cube& cube ) const
 {
     return is_state_cube( cube.literals() );
+}
+
+void pdr::log_trace_content() const
+{
+    auto line = std::format( "{}:", depth() );
+
+    for ( int i = 1; i <= depth(); ++i )
+        line += std::format( " {}", _trace_blocked_cubes[ i ].size() );
+
+    log_line_loud( "{}", line );
 }
 
 } // namespace geyser::pdr

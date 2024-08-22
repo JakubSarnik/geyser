@@ -40,11 +40,25 @@ protected:
     const options* _opts;
     variable_store* _store;
 
+    // TODO: Move verbose output out of this into a separate printer, make this
+    //       class purely abstract.
     template< class... Args >
-    void trace( std::format_string<Args...> fmt, Args&&... args ) const
+    void log_line( verbosity_level min, std::format_string<Args...> fmt, Args&&... args ) const
     {
-        if ( _opts->verbosity == verbosity_level::loud )
+        if ( _opts->verbosity >= min )
             std::cout << std::format( fmt, std::forward< Args >( args )... ) << "\n";
+    }
+
+    template< class... Args >
+    void log_line_loud( std::format_string<Args...> fmt, Args&&... args ) const
+    {
+        log_line( verbosity_level::loud, fmt, std::forward< Args >( args )... );
+    }
+
+    template< class... Args >
+    void log_line_debug( std::format_string<Args...> fmt, Args&&... args ) const
+    {
+        log_line( verbosity_level::debug, fmt, std::forward< Args >( args )... );
     }
 
 public:

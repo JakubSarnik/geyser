@@ -4,6 +4,14 @@
 
 using namespace geyser;
 
+TEST_CASE( "Verbosity levels are correctly ordered" )
+{
+    REQUIRE( verbosity_level::silent < verbosity_level::loud );
+    REQUIRE( verbosity_level::loud < verbosity_level::debug );
+    REQUIRE( verbosity_level::loud <= verbosity_level::debug );
+    REQUIRE( verbosity_level::debug <= verbosity_level::debug );
+}
+
 TEST_CASE( "No engine" )
 {
     auto cli = std::vector{ "", "-k", "10", "input.aig" };

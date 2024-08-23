@@ -150,7 +150,7 @@ solve_obligation( < s, k' > : cube * int ) -> result:
       if i < k:
         Q.add( < c, i + 1 > )
 
-  return still_safe;
+  return still_safe
 
 
 push_frame():

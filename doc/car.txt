@@ -51,5 +51,147 @@ E(s, y) true (B_0 are precisely the "bad states" as describable by Aiger). Note
 that each B_i is only an underapproximation of such "i-generalized bad states",
 except for B_0, which contains precisely the bad states. However, the
 implementation doesn't actually store B_0 explicitly (there can, of course, be
-extremely many bad states), but instead stores B_0 lazily, adding a cube there
+extremely many bad states), but instead stores it lazily, adding a cube there
 whenever we find out that F_k /\ E is satisfiable.
+
+Similarly to PDR, our solver always contains the transition relation T and the
+error formula E, activated by ActT and ActE, respectively. The inductiveness
+check requires special care (that is, clausification of disjunctions) and
+cannot be efficiently handled by the incremental API. As such, the check uses
+a special ad hoc solver initialized anew each time we perform it.
+
+The pseudocode follows. It is at times heavily inspired by our implementation
+of PDR and uses the same conventions.
+
+
+car() -> result:
+
+  # Create (empty) F_0 at the start of F (i.e. F = [F_0]).
+  push_frame()
+
+  # Create (empty) B_0 at the start of B.
+  push_coframe()
+
+  # Note that k is |F| - 1 and l is |B| - 1.
+
+  solver.add_formula( I.activated_by( Act[ 0 ] ) )
+  solver.add_formula( T.activated_by( ActT ) )
+  solver.add_formula( E.activated_by( ActE ) )
+
+  loop:
+
+    # The function enumerate_bad_states() is a generator which returns states
+    # (i.e. state variable cubes) s with the property that s lies both in F_k
+    # (is not blocked by any cube in F[ k ]) and in B_j for some 0 <= j <= l.
+    # Once no such state exists, the enumeration ends.
+
+    for < s, j > in enumerate_bad_states():
+
+      if solve_obligation( < s, k, j > ) == counterexample:
+
+        # Similarly to PDR, we need some additional bookkeeping to actually
+        # reconstruct the counterexample path. This is somewhat harder than in
+        # PDR, however, since s need not be a final state of the path (it might
+        # lie in B_j with j < l, in which case the counterexample goes from
+        # some initial state through s to some bad state in B_0).
+
+        return counterexample
+
+    push_frame() # Create (empty) F_{k + 1}.
+
+    if propagate() == invariant_found:
+      return ok
+
+    # Since the trace is not cumulative, we are no longer guaranteed that
+    # propagation finds out that our trace is already inductive. Thus, we need
+    # to check it manually.
+
+    if is_inductive()
+      return ok
+
+
+# TODO: We don't need to pass k' here, do we? See also pdr.txt.
+solve_obligation( < s, k', j' > : cube * int * int ) -> result:
+  assert 0 <= k' <= k
+  assert 0 <= j' <= l
+
+  # Both the paper and SimpleCAR use a recursive blocking scheme here, which
+  # amounts to putting proof obligations on a stack. This is also true for the
+  # "textbook" (i.e. pseudocode) description of PDR, but it was shown by Een et
+  # al. that using a priority queue is generally more efficient. We see no
+  # reason why this should be different for CAR and adapt that method also for
+  # our implementation (although it might make sense to compare both methods
+  # in our implementation explicitly).
+
+  # Minimum priority queue of proof obligations, ordered by frame. The number
+  # j' describes in which coframe the state s lies, which is needed so that we
+  # know where to add found predecessors. It might make sense to experiment
+  # with j as an additional ordering heuristic in the minimum queue, but at the
+  # moment, we have no idea how it might impact performance.
+
+  Q = minimum_queue[ cube * int * int ]()
+  Q.add( < s, k', j' > )
+
+  while ( |Q| > 0 ):
+    < c, i, j > = Q.pop_minimum()
+
+    if i == 0:
+      return counterexample
+
+    if is_already_blocked( < c, i > ):
+      continue
+
+    # Note that at this point, c is guaranteed not to intersect with the
+    # initial states.
+
+    # Is F_{i - 1} /\ T /\ c' satisfiable? Note the lack of -c, in contrast
+    # to PDR. We can no longer speak about relatively inductive clauses.
+
+    if solver.assume( Act[ i - 1 ], ActT, literals( c' ) ).is_sat():
+
+      # There is indeed a predecessor of c in F_{i - 1}. We employ the same
+      # generalization technique here as in PDR. In addition, we know that we
+      # can extend the cotrace by the resulting predecessor cube.
+
+      d = generalize_predecessor( c )
+
+      add_reaching_at( d, j + 1 )
+
+      Q.add( < d, i - 1, j + 1 > )
+      Q.add( < c, i, j > )
+
+    else:
+
+      # There is no predecessor of c in F_{i - 1}. We generalize c to a shorter
+      # cube which can be blocked at a potential higher level i' and block it
+      # at F_i'.
+
+      < d, i' > = generalize_blocked( c, i )
+      add_blocked_at( d, i' )
+
+      # This, too, is a heuristic from PDR. It makes sense to try it, but it
+      # may not work as well here as in there.
+
+      if i < k:
+        Q.add( < c, i + 1, j > )
+
+    return still_safe
+
+
+push_frame():
+  assert |F| = |Act|
+
+  F.push_back()
+  Act.push_back( make_variable() )
+
+
+push_coframe():
+  B.push_back()
+
+
+add_reaching_at( c : cube, i : int ):
+  TODO
+
+
+add_blocked_at( c : cube, i : int ):
+  TODO

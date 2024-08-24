@@ -110,6 +110,41 @@ car() -> result:
       return ok
 
 
+enumerate_bad_states() -> list[cube * int]:
+
+  # We want to generate states satisfying F_k /\ B_j for some j. The order in
+  # which we consider the cotrace might make a difference. SimpleCAR has a
+  # switch that controls whether it is considered from the beginning (i.e. from
+  # B_0 = E) or from the end, and defaults to the latter. Let's just go with
+  # that choice, but it might make sense to measure the difference.
+
+  # First, try all the cubes that are have already been found to lead to
+  # "truly" bad states (i.e. to E). The first of those certainly lies in F_k,
+  # since at this point, F_k is empty (contains all states). As its proof
+  # obligation gets solved, it might lead to the second (or any further)
+  # cube d being blocked at k (i.e. F_k /\ d is no longer satisfiable). We
+  # should make sure to filter those out.
+  # TODO: SimpleCAR seems to answer this with a syntactic check only?
+
+  for j in l .. 0:
+    for c in B[ j ]:
+      if solver.assume( Act[ k ], literals( c ) ).is_sat():
+        yield < c, j >
+
+  # After trying out all the cubes we have already stored in the cotrace, we
+  # extend B_0 by other states that so far still satisfy F_k /\ E and yield
+  # them as well. Note that B_0 represents bad states lazily and the states
+  # satisfying F_k /\ E are a certain subset of bad states.
+
+  while solver.assume( Act[ k ], ActE ).is_sat():
+
+    # TODO: SimpleCAR seems to do partial state generalization here as well.
+    s = solver.get_model().filter( is_state_variable )
+    add_reaching_at( s, 0 )
+
+    yield < s, 0 >
+
+
 # TODO: We don't need to pass k' here, do we? See also pdr.txt.
 solve_obligation( < s, k', j' > : cube * int * int ) -> result:
   assert 0 <= k' <= k
@@ -187,6 +222,51 @@ push_frame():
 
 push_coframe():
   B.push_back()
+
+
+propagate() -> propagate_result:
+
+  # Propagation works similarly as in PDR: we go from F_1 to F_{k - 1} and push
+  # a cube one frame forward if it still holds in that frame. Since the trace
+  # isn't cumulative however, we don't remove it from the current frame when
+  # pushing, and as a result, we cannot determine that we have inductive
+  # invariant by checking emptiness of a frame. Instead, we have to track
+  # whether we have indeed pushed every cube from F_i to F_{i + 1}.
+
+  # TODO: We need not always start from 1, but it suffices to start from the
+  #       minimal level that was pushed to since the last propagation occurred
+  #       (also in PDR).
+
+  for i in 1 .. ( k - 1 ):
+    pushed_all = true
+
+    for c in F[ i ]:
+
+      # The cube c holds in F_{i + 1} if it has no predecessors in F_i, i.e.
+      # if F_i /\ T /\ c' is unsatisfiable.
+
+      # TODO: Why is this even correct?
+
+      if solver.assume( Act[ i ], ActT, literals( c' ) ).is_sat():
+        pushed_all = false
+      else:
+        # TODO: CAR seems to add only those literals in c that appeared in the
+        #       unsat core, but SimpleCAR doesn't seem to really do this.
+
+        add_blocked_at( c, i + 1 )
+
+    if pushed_all:
+      return invariant_found
+
+  return invariant_not_found
+
+
+is_inductive() -> bool:
+  TODO
+
+
+is_already_blocked( < c, i > : cube * int ) -> bool:
+  TODO
 
 
 add_reaching_at( c : cube, i : int ):

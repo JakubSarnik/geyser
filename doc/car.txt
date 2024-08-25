@@ -104,7 +104,24 @@ car() -> result:
 
     # Since the trace is not cumulative, we are no longer guaranteed that
     # propagation finds out that our trace is already inductive. Thus, we need
-    # to check it manually.
+    # to check it manually. We want to check whether there exists a frame F_i
+    # with 1 <= i <= k which is (when taken as a set of states) a subset of the
+    # union of all the preceding frames F_0, ..., F_{i - 1}. If this is the
+    # case, we have found the inductive invariant S, which is the union of F_0
+    # up to F_{i - 1}. This is indeed an inductive invariant, since:
+    #
+    #   1. S contains I = F_0 by construction;
+    #   2. S is closed under the transition relation: Every state s in S lies
+    #      in some F_j, 0 <= j < i, hence every successor t of s lies in
+    #      F_{j + 1} with j + 1 <= i. If j + 1 < i, we immediately have t in S,
+    #      otherwise t lies in F_i, in which case t also lies in S by the
+    #      assumption that F_i is a subset of F_0 union ... union F_{i - 1}.
+    #
+    # This guarantees that S overapproximates the set of all states reachable
+    # from the initial ones. Further, we know that no state in S is an error
+    # state, since we maintain the invariant that all frames except possibly
+    # the last one contain only safe states, and S is a union of such safe
+    # frames.
 
     if is_inductive()
       return ok
@@ -242,10 +259,14 @@ propagate() -> propagate_result:
 
     for c in F[ i ]:
 
-      # The cube c holds in F_{i + 1} if it has no predecessors in F_i, i.e.
-      # if F_i /\ T /\ c' is unsatisfiable.
-
-      # TODO: Why is this even correct?
+      # The fact that cube c is in F[ i ] means that every state s reachable
+      # from the initial states in precisely i steps satisfies -c. If we
+      # further know that no state in c has predecessors in F_i (i.e. the
+      # formula F_i /\ T /\ c' is unsatisfiable), it holds that every state
+      # reachable in precisely i + 1 steps must also satisfy -c (if we had
+      # a state s in F_{i + 1} satisfying c, there would be a predecessor t
+      # of s in F_i such that t /\ s' would be a model of the formula). Hence,
+      # we can safely add c as blocked in frame i + 1.
 
       if solver.assume( Act[ i ], ActT, literals( c' ) ).is_sat():
         pushed_all = false
@@ -262,16 +283,174 @@ propagate() -> propagate_result:
 
 
 is_inductive() -> bool:
-  TODO
+
+  # As previously mentioned, we want to check whether there exists some frame
+  # F_i (1 <= i <= k) such that the states in F_i form a subset of the states
+  # in the union of F_0 up to F_{i - 1}. This holds if and only if there is
+  # some i (1 <= i <= k) such F_i |= F_0 \/ F_1 \/ ... \/ F_{i - 1}, i.e. iff
+  # the formula F_i /\ -(F_0 \/ F_1 \/ ... \/ F_{i - 1}) =
+  # F_i /\ -F_0 /\ ... /\ -F_{i - 1} is unsatisfiable.
+  #
+  # The problem here is that since frames (in the solver, not in our cubical
+  # representation) are CNF formulas, each of -F_0, ..., -F_{i - 1} is a
+  # formula in DNF (each -F_j is precisely the disjunction of all the cubes
+  # blocked in F[ j ]). This is not checkable by the incremental CNF-based API
+  # of the solver without polluting it by a lot of clauses that won't ever be
+  # used again. As such, we use a special solver created here just for the
+  # purposes of this check.
+
+  checker = make_solver();
+
+  # We want to check the following sequence of formulas:
+  #   * F_1 /\ -F_0
+  #   * F_2 /\ -F_0 /\ -F_1
+  #   * F_3 /\ -F_0 /\ -F_1 /\ -F_2
+  #   ...
+  #   * F_k /\ -F_0 /\ ... /\ -F_{k - 1}
+  #
+  # The negations are shared between the subsequent calls, but each non-negated
+  # frame must be deactivated after each query.
+
+  checker.add_formula( clausify_frame_negation( F[ 0 ] ) )
+
+  for i in 1 .. k:
+
+    # Add F_i into the solver activated by a temporary activation variable,
+    # which will be permanently set to false after this query.
+
+    act = make_variable()
+
+    for c in F[ 0 ]:
+      checker.add_clause( ( -c ).activated_by( act ) )
+
+    if not checker.assume( act ).is_sat():
+      return true
+
+    if i < k:
+      checker.add_clause( { -act } )
+      checker.add_formula( clausify_frame_negation( F[ i ] ) )
+
+  return false
+
+
+clausify_frame_negation( cubes : list[ cube ] ) -> cnf_formula:
+
+  # Given a list of cubes c_1, ..., c_n, we want to return the formula
+  # c_1 \/ ... \/ c_n in CNF. We use ordinary Tseitin encoding for this, i.e.
+  # we introduce a new variable x such that x <-> c_1 \/ ... \/ c_n and we
+  # assert x to be true. Note that the equivalence splits as
+  #   1. x -> c_1 \/ ... \/ c_n
+  #   2. c_1 \/ ... \/ c_n -> x
+  # where the first implication is equivalent to -x \/ c_1 \/ ... \/ c_n, and
+  # the second one splits into n implications of the form c_i -> x, each of
+  # them of the particularly simple form -c_i \/ x, which is a single clause.
+  #
+  # However, -x \/ c_1 \/ ... \/ c_n is not a clause (since each c_i is a
+  # conjunction), and as such, we perform additional clausification on this
+  # by introducing variables y_i, each of them equivalent to
+  # c_i = l_1 /\ ... /\ l_m (where each l_j is a literal). This means that
+  #   1. y_i -> l_1 /\ ... /\ l_m
+  #   2. l_1 /\ ... /\ l_m -> y_i
+  # where the first constraint splits as m implications y_i -> l_j, each of
+  # them a clause -y_i \/ l_j, and the second one is equivalent to
+  # -(l_1 /\ ... /\ l_m) \/ y_i = -l_1 \/ ... \/ -l_m \/ y_i, which is a single
+  # clause.
+
+
+  x = make_variable()
+  cnf = cnf_formula()
+
+  cnf.add_clause( { x } )
+
+  # Add the large constraint -x \/ c_1 \/ ... \/ c_n.
+
+  ys = []
+
+  for c in cubes:
+    ys.push_back( make_variable() )
+
+    # Add y_i -> l_j.
+
+    for l in literals( c ):
+      cnf.add_clause( { ys.last(), l } )
+
+    # Add -l_1 \/ ... \/ -l_m \/ y_i = -c \/ y_i.
+
+    cnf.add_clause( ( -c ).union( ys.last() ) )
+
+  # When all the y's are elaborated on, assert -x \/ y_1 \/ ... \/ y_n.
+
+  cnf.add_clause( { -x, ys[ 0 ], ..., ys[ |cubes| - 1 ] } )
+
+  # Add the clauses -c_i \/ x. However, we now have constraints saying that
+  # c_i <-> y_i, hence we can add shorter clauses -y_i \/ x instead.
+
+  for c in cubes:
+    cnf.add_clause( { -y_i, x } )
+
+  return cnf
 
 
 is_already_blocked( < c, i > : cube * int ) -> bool:
   TODO
 
 
+add_blocked_at( c : cube, i : int ):
+  assert 1 <= i <= k
+
+  # TODO: Can it happen that i > k, as in PDR?
+
+  # Similarly to PDR, we want to add c to F[ i ] and assert -c in the solver.
+  # We can also remove subsumed cubes, but only in F[ i ], since the trace is
+  # not cumulative.
+
+  for d in F[ i ]:
+    if subsumes( c, d ):
+      F[ i ].remove( d )
+
+  F[ i ].push_cube( c )
+  solver.add_clause( ( -c ).activated_by( Act[ i ] ) )
+
+
 add_reaching_at( c : cube, i : int ):
+  assert 0 <= i
+
+  # We want to add c to B[ i ]. This can also potentially create a new coframe,
+  # hence we first ensure that we have a place to push it to. Similarly to
+  # add_blocked_at, it makes sense here to remove cubes subsumed by c from
+  # B[ i ]. It might be interesting to consider removing subsumed cubes even
+  # from elsewhere in the cotrace and add c not to i, but, say, to B[ j ] where
+  # j is the minimal (or maximal) index such that c subsumed a clause in
+  # B[ j ], but there is no reason to expect that to be in general faster. It
+  # would require careful evaluation.
+
+  while l < i:
+    B.push_back()
+
+  for d in B[ i ]:
+    if subsumes( c, d ):
+      B[ i ].remove( d )
+
+  B[ i ].push_cube( c )
+
+
+subsumes( c : cube, d : cube ) -> bool:
+
+  # Same as in PDR, unsurprisingly.
+
+  if |literals( c )| > |literals( d )|:
+      return false
+
+  for l in literals( c ):
+    if not literals( d ).contains( l ):
+      return false
+
+  return true
+
+
+generalize_predecessor( s : cube ) -> cube:
   TODO
 
 
-add_blocked_at( c : cube, i : int ):
+generalize_blocked( c : cube, i : int ) -> cube * int:
   TODO

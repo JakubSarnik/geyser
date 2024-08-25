@@ -245,10 +245,10 @@ add_blocked_at( c : cube, i : int ):
   # the solver, but the solver may actually do something about them in its
   # internals, and we can reset the solver once every X SAT queries.
 
-  solver.add_clause( ( -c ).activated_by( Act[ i ] ) )
+  solver.add_clause( ( -c ).activated_by( Act[ m ] ) )
 
 
-subsumes( c : cube, d : cube ) : bool
+subsumes( c : cube, d : cube ) -> bool:
 
   # A cube c subsumes d if literals( c ) is a subset of literals( d ). For
   # example, A /\ -B subsumes A /\ -B /\ C. Note that if c subsumes d, we have

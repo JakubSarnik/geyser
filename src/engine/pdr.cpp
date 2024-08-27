@@ -88,7 +88,7 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
         {
             const auto [ c, i ] = generalize_inductive( po );
 
-            log_line_debug( "{}: {}", i, c.format() );
+            log_line_debug( "{}: {}", i, cube_to_string( c ) );
             add_blocked_at( c, i );
 
             if ( po.level() < depth() )

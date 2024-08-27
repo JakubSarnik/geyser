@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 #include <concepts>
+#include <algorithm>
+#include <span>
 #include <iterator>
+#include <optional>
 #include <cassert>
 #include <cmath>
 
@@ -276,6 +279,95 @@ public:
         return res;
     }
 };
+
+// Representation of cubes makes use of literal ordering which is more
+// complicated than comparing its underlying integer value. We order literals
+// lexicographically first on their absolute value and second on their sign.
+// This means that, given variables with values 1, 2 and 3, the following
+// vectors are ordered:
+//   1, 2, 3
+//   -1, 2, 3
+//   1, -2, 2, 3
+// while the following are not:
+//   2, 1
+//   -2, 1, 3
+//   1, -1, 2, 3
+
+inline bool cube_literal_lt( literal l1, literal l2 )
+{
+    return ( l1.var().id() < l2.var().id() ) ||
+           ( l1.var().id() == l2.var().id() && !l1.sign() && l2.sign() );
+}
+
+class ordered_cube
+{
+    std::vector< literal > _literals;
+
+public:
+    explicit ordered_cube( std::vector< literal > literals ) : _literals{ std::move( literals ) }
+    {
+        std::ranges::sort( _literals, cube_literal_lt );
+    };
+
+    friend auto operator<=>( const ordered_cube&, const ordered_cube& ) = default;
+
+    [[nodiscard]] const std::vector< literal >& literals() const { return _literals; }
+
+    // Returns true if this syntactically subsumes that, i.e. if literals in
+    // this form a subset of literals in that. Note that c.subsumes( d ) = true
+    // guarantees that d entails c.
+    [[nodiscard]]
+    bool subsumes( const ordered_cube& that ) const
+    {
+        return std::ranges::includes( that._literals, _literals, cube_literal_lt );
+    }
+
+    // Returns the cube negated as a cnf_formula containing a single clause.
+    [[nodiscard]]
+    cnf_formula negate() const
+    {
+        auto f = cnf_formula{};
+        f.add_clause( _literals );
+
+        f.inplace_transform( []( literal lit )
+        {
+            return !lit;
+        } );
+
+        return f;
+    }
+
+    // Returns the first literal corresponding to a variable var in the cube.
+    // This is typically called when there is at most a single literal for a
+    // given variable.
+    [[nodiscard]]
+    std::optional< literal > find( variable var ) const
+    {
+        // We could do a binary search here, but that's more complex code than
+        // necessary for the typical use case of this function, i.e. building
+        // a counterexample trace.
+
+        for ( const auto lit : _literals )
+            if ( lit.var() == var )
+                return literal{ var, !lit.sign() };
+
+        return {};
+    }
+};
+
+inline std::string cube_to_string( const ordered_cube& cube )
+{
+    auto res = std::string{};
+    auto sep = "";
+
+    for ( const auto lit : cube.literals() )
+    {
+        res += sep + std::to_string( lit.value() );
+        sep = ", ";
+    }
+
+    return res;
+}
 
 } // namespace geyser
 

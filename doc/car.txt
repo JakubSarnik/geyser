@@ -524,5 +524,30 @@ generalize_blocked( c : cube, i : int ) -> cube:
   return get_minimal_core( core, thunk )
 
 
-get_minimal_core( core : cube, query_thunk : () -> void ) -> cube:
-  TODO
+get_minimal_core( seed : cube, requery : cube -> bool ) -> cube:
+
+  # We made a SAT query, found it to be unsatosfoan;e and the core returned
+  # from the solver (more specifically, the part of the core which includes the
+  # assumption literals we are interested in) has been given to us as the seed.
+  # The function requery poses the same query to the solver, but with the
+  # original interesting part of the assumption literals replaced by the
+  # provided parameter, which is to be interpreted as a potential smaller core.
+
+  core = seed
+
+  # Note that the following loop goes through a collection which is changing
+  # in its body, which is something that the implementation must handle.
+
+  for l in literals( core ):
+    smaller = core.remove( l )
+
+    if not requery( smaller ):
+
+      # After removing this literal, the query is still not satisfiable, which
+      # means that smaller is an unsat core strictly smaller than the original
+      # one. Furthermore, we can ask the solver about its new unsat core, which
+      # might be even smaller than our 'smaller'.
+
+      core = solver.core().filter( fun lit => var( lit ).is_state_variable )
+
+  return core

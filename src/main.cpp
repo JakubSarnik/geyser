@@ -41,7 +41,7 @@ int main( int argc, char** argv )
 
     const auto trace = [ & ]( const std::string& s )
     {
-        if ( opts->verbosity == verbosity_level::loud )
+        if ( opts->verbosity >= verbosity_level::loud )
             std::cout << s << std::flush;
     };
 

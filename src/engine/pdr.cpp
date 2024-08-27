@@ -141,7 +141,6 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
         }
     }
 
-    //int res_level = std::min( j + 1, depth() );
     int res_level = j + 1;
 
     auto all_lits = _ctis.get( po.handle() ).state_vars().literals();
@@ -250,11 +249,6 @@ bool pdr::intersects_initial_states( std::span< const literal > c )
             return false;
 
     return true;
-
-//    return with_solver()
-//           .assume( _trace_activators[ 0 ] )
-//           .assume( c.literals() )
-//           .is_sat();
 }
 
 // Check whether, given po = < s, i >, s is inductive relative to
@@ -307,8 +301,6 @@ void pdr::add_blocked_at( const cube& c, int level, int start_from /* = 1*/ )
 // Returns true if the system has been proven safe by finding an invariant.
 bool pdr::propagate()
 {
-    //log_line_loud( "Propagating (k = {})", depth() );
-
     assert( _trace_blocked_cubes[ depth() ].empty() );
 
     for ( int i = 1; i < depth(); ++i )
@@ -326,9 +318,6 @@ bool pdr::propagate()
     }
 
     log_trace_content();
-
-    //for ( int i = 1; i <= depth(); ++i )
-    //    log_line_loud( "  F[ {} ]: {} cubes", i, _trace_blocked_cubes[ i ].size() );
 
     return false;
 }

@@ -299,17 +299,17 @@ inline bool cube_literal_lt( literal l1, literal l2 )
            ( l1.var().id() == l2.var().id() && !l1.sign() && l2.sign() );
 }
 
-class ordered_cube
+class cube
 {
     std::vector< literal > _literals;
 
 public:
-    explicit ordered_cube( std::vector< literal > literals ) : _literals{ std::move( literals ) }
+    explicit cube( std::vector< literal > literals ) : _literals{ std::move( literals ) }
     {
         std::ranges::sort( _literals, cube_literal_lt );
     };
 
-    friend auto operator<=>( const ordered_cube&, const ordered_cube& ) = default;
+    friend auto operator<=>( const cube&, const cube& ) = default;
 
     [[nodiscard]] const std::vector< literal >& literals() const { return _literals; }
 
@@ -317,7 +317,7 @@ public:
     // this form a subset of literals in that. Note that c.subsumes( d ) = true
     // guarantees that d entails c.
     [[nodiscard]]
-    bool subsumes( const ordered_cube& that ) const
+    bool subsumes( const cube& that ) const
     {
         return std::ranges::includes( that._literals, _literals, cube_literal_lt );
     }
@@ -355,12 +355,12 @@ public:
     }
 };
 
-inline std::string cube_to_string( const ordered_cube& cube )
+inline std::string cube_to_string( const cube& c )
 {
     auto res = std::string{};
     auto sep = "";
 
-    for ( const auto lit : cube.literals() )
+    for ( const auto lit : c.literals() )
     {
         res += sep + std::to_string( lit.value() );
         sep = ", ";

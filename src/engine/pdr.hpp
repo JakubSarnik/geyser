@@ -97,8 +97,7 @@ public:
 };
 
 // TODO: Bradley also stores distance to the error and uses it as
-//       a heuristic in the ordering. Investigate? (Pass it by ref if it
-//       becomes larger.)
+//       a heuristic in the ordering. Investigate?
 class proof_obligation
 {
     // Declared in this order so that the defaulted comparison operator

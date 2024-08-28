@@ -440,7 +440,7 @@ add_reaching_at( c : cube, i : int ):
   # would require careful evaluation.
 
   while l < i:
-    B.push_back()
+    push_coframe()
 
   for d in B[ i ]:
     if subsumes( c, d ):

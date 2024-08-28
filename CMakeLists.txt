@@ -37,6 +37,7 @@ add_library(geyser STATIC
         src/witness_writer.cpp
         src/engine/bmc.cpp
         src/engine/pdr.cpp
+        src/engine/car.cpp
 )
 
 target_link_libraries(geyser PUBLIC aiger)

@@ -251,10 +251,8 @@ bool pdr::intersects_initial_states( std::span< const literal > c )
     return true;
 }
 
-// Check whether, given po = < s, i >, s is inductive relative to
-// R_{i - 1}, i.e. whether the formula R_{i - 1} /\ -s /\ T /\ s' is
-// unsatisfiable.
-// bool pdr::is_relative_inductive( const proof_obligation& po )
+// Check whether a cube s in R_i is inductive relative to R_{i - 1}, i.e.
+// whether the formula R_{i - 1} /\ -s /\ T /\ s' is unsatisfiable.
 bool pdr::is_relative_inductive( std::span< const literal > s, int i )
 {
     assert( i >= 1 );

@@ -64,6 +64,8 @@ result car::check( int bound )
         if ( is_inductive() )
             return ok{};
 
+        log_trace_content();
+        log_cotrace_content();
     }
 
     return unknown{ std::format( "counterexample not found after {} frames", bound ) };
@@ -116,7 +118,7 @@ std::optional< counterexample > car::check_new_error_states()
     return {};
 }
 
-std::optional< bad_state_handle > car::get_error_state()
+std::optional< bad_cube_handle > car::get_error_state()
 {
     assert( depth() < _trace_activators.size() );
 
@@ -139,12 +141,165 @@ std::optional< bad_state_handle > car::get_error_state()
 
 std::optional< counterexample > car::solve_obligation( const proof_obligation& starting_po )
 {
+    assert( 0 <= starting_po.level() && starting_po.level() <= depth() );
+    assert( 0 <= starting_po.colevel() && starting_po.colevel() <= codepth() );
+
+    auto min_queue = std::priority_queue< proof_obligation,
+    std::vector< proof_obligation >, std::greater<> >{};
+
+    min_queue.push( starting_po );
+
+    while ( !min_queue.empty() )
+    {
+        const auto po = min_queue.top();
+        min_queue.pop();
+
+        if ( po.level() == 0 )
+            return build_counterexample( po.handle() );
+
+        if ( is_already_blocked( po ) )
+            continue;
+
+        if ( has_predecessor( _cotrace.get( po.handle() ).state_vars().literals(), po.level() ) )
+        {
+            const auto pred = get_predecessor( po );
+            const auto ix = po.colevel() + 1;
+
+            log_line_debug( "B[{}]: {}", ix, cube_to_string( _cotrace.get( pred ).state_vars() ) );
+            add_reaching_at( pred, ix );
+
+            min_queue.emplace( pred, po.level() - 1, ix );
+            min_queue.push( po );
+        }
+        else
+        {
+            auto c = generalize_blocked( po );
+
+            log_line_debug( "F[{}]: {}", po.level(), cube_to_string( c ) );
+            add_blocked_at( c, po.level() );
+
+            // TODO: Is this good in CAR?
+            // if ( po.level() < depth() )
+            //     min_queue.emplace( po.handle(), po.level() + 1 );
+        }
+    }
+
+    return {};
+}
+
+counterexample car::build_counterexample( bad_cube_handle initial )
+{
+    log_line_loud( "Found a counterexample at k = {}", depth() );
+
+    auto get_vars = []( variable_range range, const cube& val )
+    {
+        auto row = valuation{};
+        row.reserve( range.size() );
+
+        for ( const auto var : range )
+            row.push_back( val.find( var ).value_or( literal{ var, true } ) );
+
+        return row;
+    };
+
+    auto entry = std::optional{ _cotrace.get( initial ) };
+    auto previous = std::optional< bad_cube >{};
+
+    auto inputs = std::vector< valuation >{};
+    inputs.reserve( depth() );
+
+    while ( entry.has_value() )
+    {
+        inputs.emplace_back( get_vars( _system->input_vars(), entry->input_vars() ) );
+        previous = entry;
+        entry = entry->successor().transform( [ & ]( bad_cube_handle h ){ return _cotrace.get( h ); } );
+    }
+
+    if ( _forward )
+    {
+        auto first = get_vars( _system->state_vars(), _cotrace.get( initial ).state_vars() );
+
+        return counterexample{ std::move( first ), std::move( inputs ) };
+    }
+    else
+    {
+        // Handle initial actually points to the terminal state of the
+        // counterexample and the real initial state is the penultimate entry.
+
+        assert( previous.has_value() );
+
+        auto first = get_vars( _system->state_vars(), previous->state_vars() ); // NOLINT
+        std::ranges::reverse( inputs );
+
+        return counterexample{ std::move( first ), std::move( inputs ) };
+    }
+}
+
+bool car::is_already_blocked( const proof_obligation& po )
+{
+    assert( 1 <= po.level() && po.level() <= depth() );
+
+    const auto& s = _cotrace.get( po.handle() ).state_vars();
+
+    for ( const auto& c : _trace_blocked_cubes[ po.level() ] )
+        if ( c.subsumes( s ) )
+            return true;
+
+    return !with_solver()
+            .assume( _trace_activators[ po.level() ] )
+            .assume( s.literals() )
+            .is_sat();
+}
+
+// Given a state s in R_i, check whether it has a predecessor in R_{i - 1},
+// i.e. whether the formula R_{i - 1} /\ T /\ s' is satisfiable.
+bool car::has_predecessor( std::span< const literal > s, int i )
+{
+    assert( i >= 1 );
+
+    return with_solver()
+            .assume( _trace_activators[ i - 1 ] )
+            .assume( _transition_activator )
+            .assume_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
+            .is_sat();
+}
+
+bad_cube_handle car::get_predecessor( const proof_obligation& po )
+{
+    auto ins = _solver.get_model( _system->input_vars() );
+    auto p = _solver.get_model( _system->state_vars() );
+
+    if ( _forward )
+    {
+        const auto& s = _cotrace.get( po.handle() ).state_vars().literals();
+
+        [[maybe_unused]]
+        const auto sat = with_solver()
+                .constrain_not_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
+                .assume( _transition_activator )
+                .assume( ins )
+                .assume( p )
+                .is_sat();
+
+        assert( !sat );
+
+        return _cotrace.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
+    }
+    else
+    {
+        // We cannot generalize in the backward mode.
+        return _cotrace.make( cube{ std::move( p ) }, cube{ std::move( ins ) }, po.handle() );
+    }
+}
+
+cube car::generalize_blocked( const proof_obligation& po )
+{
     // TODO
 }
 
-void car::add_reaching_at( bad_state_handle h, int level )
+void car::add_reaching_at( bad_cube_handle h, int level )
 {
-    assert( 0 <= j );
+    assert( 0 <= level );
 
     while ( codepth() < level )
         push_coframe();
@@ -166,6 +321,30 @@ void car::add_reaching_at( bad_state_handle h, int level )
     coframe.emplace_back( h );
 }
 
+void car::add_blocked_at( const cube& c, int level )
+{
+    assert( 1 <= level && level <= depth() );
+    assert( is_state_cube( c ) );
+
+    auto& frame = _trace_blocked_cubes[ level ];
+
+    for ( std::size_t i = 0; i < frame.size(); )
+    {
+        if ( c.subsumes( frame[ i ] ) )
+        {
+            frame[ i ] = frame.back();
+            frame.pop_back();
+        }
+        else
+            ++i;
+    }
+
+    assert( level < _trace_activators.size() );
+
+    frame.emplace_back( c );
+    _solver.assert_formula( c.negate().activate( _trace_activators[ level ].var() ) );
+}
+
 bool car::propagate()
 {
     // TODO
@@ -174,6 +353,50 @@ bool car::propagate()
 bool car::is_inductive()
 {
     // TODO
+}
+
+literal car::prime_literal( literal lit ) const
+{
+    const auto [ type, pos ] = _system->get_var_info( lit.var() );
+    assert( type == var_type::state );
+
+    return lit.substitute( _system->next_state_vars().nth( pos ) );
+}
+
+bool car::is_state_cube( std::span< const literal > literals ) const
+{
+    const auto is_state_var = [ & ]( variable var )
+    {
+        const auto [ type, _ ] = _system->get_var_info( var );
+        return type == var_type::state;
+    };
+
+    return std::ranges::all_of( literals, [ & ]( literal lit ){ return is_state_var( lit.var() ); } );
+}
+
+bool car::is_state_cube( const cube& cube ) const
+{
+    return is_state_cube( cube.literals() );
+}
+
+void car::log_trace_content() const
+{
+    auto line = std::format( "F[{}]:", depth() );
+
+    for ( int i = 1; i <= depth(); ++i )
+        line += std::format( " {}", _trace_blocked_cubes[ i ].size() );
+
+    log_line_loud( "{}", line );
+}
+
+void car::log_cotrace_content() const
+{
+    auto line = std::format( "B[{}]:", depth() );
+
+    for ( int i = 1; i <= codepth(); ++i )
+        line += std::format( " {}", _cotrace_found_cubes[ i ].size() );
+
+    log_line_loud( "{}", line );
 }
 
 transition_system backward_car::reverse_system( const transition_system& system )

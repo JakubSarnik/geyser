@@ -3,6 +3,7 @@
 #include "base.hpp"
 #include "solver.hpp"
 #include <optional>
+#include <span>
 
 namespace geyser::car
 {
@@ -16,50 +17,50 @@ namespace geyser::car
 // subsumed at the same level). Hence, we keep a simple pool as well, and our
 // cotrace just points to its entries.
 
-class bad_state_handle
+class bad_cube_handle
 {
     friend class cotrace_pool;
 
     std::size_t _value;
 
-    explicit bad_state_handle( std::size_t value ) : _value{ value } {}
+    explicit bad_cube_handle( std::size_t value ) : _value{ value } {}
 
 public:
-    friend auto operator<=>( bad_state_handle, bad_state_handle ) = default;
+    friend auto operator<=>( bad_cube_handle, bad_cube_handle ) = default;
 };
 
-class bad_state
+class bad_cube
 {
     cube _state_vars;
     cube _input_vars;
-    std::optional< bad_state_handle > _successor;
+    std::optional< bad_cube_handle > _successor;
 
 public:
-    bad_state( cube state_vars, cube input_vars, std::optional< bad_state_handle > successor )
+    bad_cube( cube state_vars, cube input_vars, std::optional< bad_cube_handle > successor )
         : _state_vars{ std::move( state_vars ) }, _input_vars{ std::move( input_vars ) },
           _successor{ successor } {}
 
     [[nodiscard]] const cube& state_vars() const { return _state_vars; }
     [[nodiscard]] const cube& input_vars() const { return _input_vars; }
-    [[nodiscard]] std::optional< bad_state_handle > successor() const { return _successor; }
+    [[nodiscard]] std::optional< bad_cube_handle > successor() const { return _successor; }
 };
 
 // There is no freeing of memory. We would only do that to release the memory
 // of subsumed cubes, which is not worth the hassle.
 class cotrace_pool
 {
-    std::vector< bad_state > _entries;
+    std::vector< bad_cube > _entries;
 
 public:
     [[nodiscard]]
-    bad_state_handle make( cube state_vars, cube input_vars,
-                           std::optional< bad_state_handle > successor = std::nullopt )
+    bad_cube_handle make( cube state_vars, cube input_vars,
+                          std::optional< bad_cube_handle > successor = std::nullopt )
     {
         _entries.emplace_back( std::move( state_vars ), std::move( input_vars ), successor );
-        return bad_state_handle{ _entries.size() - 1 };
+        return bad_cube_handle{ _entries.size() - 1 };
     }
 
-    [[nodiscard]] bad_state& get( bad_state_handle handle )
+    [[nodiscard]] bad_cube& get( bad_cube_handle handle )
     {
         assert( 0 <= handle._value && handle._value < _entries.size() );
         return _entries[ handle._value ];
@@ -70,10 +71,10 @@ class proof_obligation
 {
     int _level; // The i so that the state is in F_i
     int _colevel; // The j so that the state is in B_j
-    bad_state_handle _handle;
+    bad_cube_handle _handle;
 
 public:
-    proof_obligation( bad_state_handle handle, int level, int colevel )
+    proof_obligation( bad_cube_handle handle, int level, int colevel )
         : _level{ level }, _colevel{ colevel }, _handle{ handle }
     {
         assert( _level >= 0 );
@@ -88,7 +89,7 @@ public:
 
     [[nodiscard]] int level() const { return _level; }
     [[nodiscard]] int colevel() const { return _colevel; }
-    [[nodiscard]] bad_state_handle handle() const { return _handle; }
+    [[nodiscard]] bad_cube_handle handle() const { return _handle; }
 };
 
 class car : public engine
@@ -104,7 +105,7 @@ class car : public engine
     cnf_formula _activated_error;
 
     using cube_set = std::vector< cube >;
-    using handle_set = std::vector< bad_state_handle >;
+    using handle_set = std::vector< bad_cube_handle >;
 
     std::vector< cube_set > _trace_blocked_cubes;
     std::vector< literal > _trace_activators;
@@ -161,13 +162,29 @@ class car : public engine
     std::optional< counterexample > check_existing_cotrace();
     std::optional< counterexample > check_new_error_states();
 
-    std::optional< bad_state_handle > get_error_state();
+    std::optional< bad_cube_handle > get_error_state();
     std::optional< counterexample > solve_obligation( const proof_obligation& starting_po );
+    counterexample build_counterexample( bad_cube_handle initial );
+    bool is_already_blocked( const proof_obligation& po );
+
+    bool has_predecessor( std::span< const literal > s, int i );
+    bad_cube_handle get_predecessor( const proof_obligation& po );
+    cube generalize_blocked( const proof_obligation& po );
 
     bool propagate();
     bool is_inductive();
 
-    void add_reaching_at( bad_state_handle h, int level );
+    void add_reaching_at( bad_cube_handle h, int level );
+    void add_blocked_at( const cube& c, int level );
+
+    // TODO: This is literally the same as in PDR. Move to transition_system?
+    literal prime_literal( literal lit ) const;
+
+    [[maybe_unused]] bool is_state_cube( std::span< const literal > literals ) const;
+    [[maybe_unused]] bool is_state_cube( const cube& cube ) const;
+
+    void log_trace_content() const;
+    void log_cotrace_content() const;
 
 public:
     car( const options& opts, variable_store& store, bool forward )

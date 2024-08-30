@@ -76,29 +76,14 @@ std::optional< counterexample > car::check_existing_cotrace()
     // Iterate through the cotrace in reverse, i.e. from states that are
     // furthest from the error states (at least as far as we know at the
     // moment). This is a heuristic which is used by SimpleCAR in the default
-    // mode.
+    // mode. Note that we don't check here whether cubes in the cotrace still
+    // have a non-empty intersection with the current frame, since that will
+    // be checked by is_already_blocked in solve_obligation.
 
     for ( int j = codepth(); j >= 0; --j )
-    {
         for ( const auto handle : _cotrace_found_cubes[ j ] )
-        {
-            // Does this entry still have non-empty intersection with the
-            // current frame?
-
-            const auto& s = _cotrace.get( handle ).state_vars();
-
-            assert( depth() < _trace_activators.size() );
-
-            if ( with_solver()
-                    .assume( _trace_activators[ depth() ] )
-                    .assume( s.literals() )
-                    .is_sat() )
-            {
-                if ( const auto cex = solve_obligation( proof_obligation{ handle, depth(), j } ); cex.has_value() )
-                    return cex;
-            }
-        }
-    }
+            if ( const auto cex = solve_obligation( proof_obligation{ handle, depth(), j } ); cex.has_value() )
+                return cex;
 
     return {};
 }
@@ -145,7 +130,7 @@ std::optional< counterexample > car::solve_obligation( const proof_obligation& s
     assert( 0 <= starting_po.colevel() && starting_po.colevel() <= codepth() );
 
     auto min_queue = std::priority_queue< proof_obligation,
-    std::vector< proof_obligation >, std::greater<> >{};
+        std::vector< proof_obligation >, std::greater<> >{};
 
     min_queue.push( starting_po );
 
@@ -347,7 +332,27 @@ void car::add_blocked_at( const cube& c, int level )
 
 bool car::propagate()
 {
-    // TODO
+    assert( _trace_blocked_cubes[ depth() ].empty() );
+
+    for ( int i = 1; i < depth(); ++i )
+    {
+        auto pushed_all = true;
+
+        for ( const auto &c : _trace_blocked_cubes[ i ] )
+        {
+            // TODO: Get the unsat core in the false branch, as in the paper?
+
+            if ( has_predecessor( c.literals(), i + 1 ) )
+                pushed_all = false;
+            else
+                add_blocked_at( c, i + 1 );
+        }
+
+        if ( pushed_all )
+            return true;
+    }
+
+    return false;
 }
 
 bool car::is_inductive()

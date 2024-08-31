@@ -291,6 +291,30 @@ TEST_CASE( "CNF formula is built correctly using add_cnf" )
     REQUIRE( to_nums( f1 ) == std::vector{ 1, 2, 2, 0, -2, 0, 1, 0, 2, -3, 0 } );
 }
 
+TEST_CASE( "CNF formula built from clause() can be added to" )
+{
+    auto a = literal{ variable{ 1 } };
+    auto b = literal{ variable{ 2 } };
+    auto c = literal{ variable{ 3 } };
+
+    SECTION( "Empty clause" )
+    {
+        auto f = cnf_formula::clause( std::vector< literal >{} );
+        f.add_clause( a, b );
+        f.add_clause( c );
+
+        REQUIRE( to_nums( f ) == std::vector{ 0, 1, 2, 0, 3, 0 } );
+    }
+
+    SECTION( "Non-empty clause" )
+    {
+        auto f = cnf_formula::clause( std::vector{ a, !b } );
+        f.add_clause( !c );
+
+        REQUIRE( to_nums( f ) == std::vector{ 1, -2, 0, -3, 0 } );
+    }
+}
+
 TEST_CASE( "Formulas are mapped correctly" )
 {
     auto store = variable_store{};

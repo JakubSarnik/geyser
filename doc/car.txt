@@ -521,12 +521,12 @@ generalize_blocked( c : cube, i : int ) -> cube:
   # TODO: SimpleCAR seemingly tries to make the resulting core not intersect
   #       the initial states. Why?
 
-  return get_minimal_core( core, thunk )
+  return get_minimal_core( core, thunk ).map( fun lit => lit.unprime() )
 
 
 get_minimal_core( seed : cube, requery : cube -> bool ) -> cube:
 
-  # We made a SAT query, found it to be unsatosfoan;e and the core returned
+  # We made a SAT query, found it to be unsatisfiable and the core returned
   # from the solver (more specifically, the part of the core which includes the
   # assumption literals we are interested in) has been given to us as the seed.
   # The function requery poses the same query to the solver, but with the

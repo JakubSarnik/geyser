@@ -114,7 +114,7 @@ cti_handle pdr::get_predecessor( const proof_obligation& po )
 
     [[maybe_unused]]
     const auto sat = with_solver()
-            .constrain_not_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
+            .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
             .assume( _transition_activator )
             .assume( ins )
             .assume( p )
@@ -192,11 +192,8 @@ counterexample pdr::build_counterexample( cti_handle initial )
         auto row = valuation{};
         row.reserve( range.size() );
 
-        for ( int vi = 0; vi < range.size(); ++vi )
-        {
-            const auto var = range.nth( vi );
+        for ( const auto var : range )
             row.push_back( val.find( var ).value_or( literal{ var, true } ) );
-        }
 
         return row;
     };
@@ -261,7 +258,7 @@ bool pdr::is_relative_inductive( std::span< const literal > s, int i )
             .constrain_not( s )
             .assume( activators_from( i - 1 ) )
             .assume( _transition_activator )
-            .assume_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
+            .assume_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
             .is_sat();
 }
 
@@ -269,7 +266,7 @@ void pdr::add_blocked_at( const cube& c, int level, int start_from /* = 1*/ )
 {
     assert( 1 <= level );
     assert( 1 <= start_from && start_from <= level );
-    assert( is_state_cube( c ) );
+    assert( is_state_cube( c.literals() ) );
 
     const auto k = std::min( level, depth() );
 
@@ -338,14 +335,6 @@ void pdr::refresh_solver()
             _solver.assert_formula( cube.negate().activate( act.var() ) );
 }
 
-literal pdr::prime_literal( literal lit ) const
-{
-    const auto [ type, pos ] = _system->get_var_info( lit.var() );
-    assert( type == var_type::state );
-
-    return lit.substitute( _system->next_state_vars().nth( pos ) );
-}
-
 // Returns true if cube contains only state variables. Used for assertions
 // only.
 bool pdr::is_state_cube( std::span< const literal > literals ) const
@@ -357,11 +346,6 @@ bool pdr::is_state_cube( std::span< const literal > literals ) const
     };
 
     return std::ranges::all_of( literals, [ & ]( literal lit ){ return is_state_var( lit.var() ); } );
-}
-
-bool pdr::is_state_cube( const cube& cube ) const
-{
-    return is_state_cube( cube.literals() );
 }
 
 void pdr::log_trace_content() const

@@ -243,7 +243,7 @@ TEST_CASE( "CNF formula is built correctly using add_clause" )
     auto a = literal{ store.make() };
     auto b = literal{ store.make() };
 
-    formula.add_clause( { a, b } );
+    formula.add_clause( std::vector{ a, b } );
 
     REQUIRE( formula.literals() == std::vector{ a, b, literal::separator } );
     REQUIRE( to_nums( formula ) == std::vector{ 1, 2, 0 } );

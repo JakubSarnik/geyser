@@ -215,10 +215,18 @@ public:
         return contradiction;
     }
 
-    void add_clause( const std::vector< literal >& clause )
+    static cnf_formula clause( std::span< const literal > c )
+    {
+        auto f = cnf_formula{};
+        f.add_clause( c );
+
+        return f;
+    }
+
+    void add_clause( std::span< const literal > clause )
     {
         _literals.reserve( _literals.size() + clause.size() + 1 );
-        _literals.insert( _literals.end(), clause.cbegin(), clause.cend() );
+        _literals.insert( _literals.end(), clause.begin(), clause.end() );
         _literals.push_back( literal::separator );
     }
 

@@ -69,6 +69,22 @@ public:
 
         std::terminate(); // Unreachable
     }
+
+    [[nodiscard]] literal prime( literal lit ) const
+    {
+        const auto [ type, pos ] = get_var_info( lit.var() );
+        assert( type == var_type::state );
+
+        return lit.substitute( _next_state_vars.nth( pos ) );
+    }
+
+    [[nodiscard]] literal unprime( literal lit ) const
+    {
+        const auto [ type, pos ] = get_var_info( lit.var() );
+        assert( type == var_type::next_state );
+
+        return lit.substitute( _state_vars.nth( pos ) );
+    }
 };
 
 } // namespace geyser

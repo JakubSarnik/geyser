@@ -192,10 +192,7 @@ class pdr : public engine
     void add_blocked_at( const cube& cube, int level, int start_from = 1 );
     bool propagate();
 
-    literal prime_literal( literal lit ) const;
-
     [[maybe_unused]] bool is_state_cube( std::span< const literal > literals ) const;
-    [[maybe_unused]] bool is_state_cube( const cube& cube ) const;
 
     void log_trace_content() const;
 

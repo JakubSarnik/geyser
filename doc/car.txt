@@ -327,7 +327,7 @@ is_inductive() -> bool:
 
     act = make_variable()
 
-    for c in F[ 0 ]:
+    for c in F[ i ]:
       checker.add_clause( ( -c ).activated_by( act ) )
 
     if not checker.assume( act ).is_sat():
@@ -379,7 +379,7 @@ clausify_frame_negation( cubes : list[ cube ] ) -> cnf_formula:
     # Add y_i -> l_j.
 
     for l in literals( c ):
-      cnf.add_clause( { ys.last(), l } )
+      cnf.add_clause( { -ys.last(), l } )
 
     # Add -l_1 \/ ... \/ -l_m \/ y_i = -c \/ y_i.
 
@@ -392,8 +392,8 @@ clausify_frame_negation( cubes : list[ cube ] ) -> cnf_formula:
   # Add the clauses -c_i \/ x. However, we now have constraints saying that
   # c_i <-> y_i, hence we can add shorter clauses -y_i \/ x instead.
 
-  for c in cubes:
-    cnf.add_clause( { -y_i, x } )
+  for y in ys:
+    cnf.add_clause( { -y, x } )
 
   return cnf
 
@@ -548,6 +548,6 @@ get_minimal_core( seed : cube, requery : cube -> bool ) -> cube:
       # one. Furthermore, we can ask the solver about its new unsat core, which
       # might be even smaller than our 'smaller'.
 
-      core = solver.core().filter( fun lit => var( lit ).is_state_variable )
+      core = smaller.filter( fun lit => solver.core().contains( lit ) )
 
   return core

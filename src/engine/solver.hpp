@@ -154,6 +154,24 @@ public:
     }
 
     [[nodiscard]]
+    std::vector< literal > get_core( variable_range variables )
+    {
+        auto core = std::vector< literal >{};
+
+        for ( const auto var : variables )
+        {
+            const auto lit = literal{ var };
+
+            if ( is_in_core( lit ) )
+                core.emplace_back( lit );
+            else if ( is_in_core( !lit ) )
+                core.emplace_back( !lit );
+        }
+
+        return core;
+    }
+
+    [[nodiscard]]
     query_builder query()
     {
         return query_builder{ *this };

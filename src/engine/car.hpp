@@ -4,6 +4,7 @@
 #include "solver.hpp"
 #include <optional>
 #include <span>
+#include <concepts>
 
 namespace geyser::car
 {
@@ -170,6 +171,8 @@ class car : public engine
     bool has_predecessor( std::span< const literal > s, int i );
     bad_cube_handle get_predecessor( const proof_obligation& po );
     cube generalize_blocked( const proof_obligation& po );
+    std::vector< literal > get_minimal_core( std::span< const literal > seed,
+                                             std::invocable< std::span< const literal > > auto requery );
 
     bool propagate();
     bool is_inductive();
@@ -177,11 +180,8 @@ class car : public engine
     void add_reaching_at( bad_cube_handle h, int level );
     void add_blocked_at( const cube& c, int level );
 
-    // TODO: This is literally the same as in PDR. Move to transition_system?
-    literal prime_literal( literal lit ) const;
-
     [[maybe_unused]] bool is_state_cube( std::span< const literal > literals ) const;
-    [[maybe_unused]] bool is_state_cube( const cube& cube ) const;
+    [[maybe_unused]] bool is_next_state_cube( std::span< const literal > literals ) const;
 
     void log_trace_content() const;
     void log_cotrace_content() const;

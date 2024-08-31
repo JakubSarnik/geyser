@@ -245,7 +245,7 @@ bool car::has_predecessor( std::span< const literal > s, int i )
     return with_solver()
             .assume( _trace_activators[ i - 1 ] )
             .assume( _transition_activator )
-            .assume_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
+            .assume_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
             .is_sat();
 }
 
@@ -258,17 +258,26 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
     {
         const auto& s = _cotrace.get( po.handle() ).state_vars().literals();
 
-        [[maybe_unused]]
-        const auto sat = with_solver()
-                .constrain_not_mapped( s, [ & ]( literal l ){ return prime_literal( l ); } )
-                .assume( _transition_activator )
-                .assume( ins )
-                .assume( p )
-                .is_sat();
+        const auto query = [ & ]( std::span< const literal > assumptions )
+        {
+            assert( is_state_cube( assumptions ) );
 
+            return with_solver()
+                    .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
+                    .assume( _transition_activator )
+                    .assume( ins )
+                    .assume( assumptions )
+                    .is_sat();
+        };
+
+        [[maybe_unused]]
+        const auto sat = query( p );
         assert( !sat );
 
-        return _cotrace.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
+        auto core = _solver.get_core( p );
+
+        return _cotrace.make( cube{ get_minimal_core( std::move( core ), query ) },
+                              cube{ std::move( ins ) }, po.handle() );
     }
     else
     {
@@ -279,7 +288,53 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
 
 cube car::generalize_blocked( const proof_obligation& po )
 {
-    // TODO
+    auto core = _solver.get_core( _system->next_state_vars() );
+
+    const auto thunk = [ & ]( std::span< const literal > assumptions )
+    {
+        assert( is_next_state_cube( assumptions ) );
+
+        return with_solver()
+                .assume( _trace_activators[ po.level() - 1 ] )
+                .assume( _transition_activator )
+                .assume( assumptions )
+                .is_sat();
+    };
+
+    auto minimal = get_minimal_core( core, thunk );
+
+    for ( auto& lit : minimal )
+        lit = _system->unprime( lit );
+
+    return cube{ minimal };
+}
+
+std::vector< literal > car::get_minimal_core( std::span< const literal > seed,
+                                              std::invocable< std::span< const literal > > auto requery )
+{
+    auto core = std::vector< literal >( seed.begin(), seed.end() );
+    const auto lits = core;
+
+    // TODO: Make this more efficient?
+
+    for ( const auto lit : lits )
+    {
+        core.erase( std::remove( core.begin(), core.end(), lit ), core.end() );
+
+        if ( !requery( core ) )
+        {
+            core.erase( std::remove_if( core.begin(), core.end(), [ & ]( literal lit )
+            {
+                return !_solver.is_in_core( lit );
+            } ), core.end() );
+        }
+        else
+        {
+            core.push_back( lit );
+        }
+    }
+
+    return core;
 }
 
 void car::add_reaching_at( bad_cube_handle h, int level )
@@ -309,7 +364,7 @@ void car::add_reaching_at( bad_cube_handle h, int level )
 void car::add_blocked_at( const cube& c, int level )
 {
     assert( 1 <= level && level <= depth() );
-    assert( is_state_cube( c ) );
+    assert( is_state_cube( c.literals() ) );
 
     auto& frame = _trace_blocked_cubes[ level ];
 
@@ -357,15 +412,74 @@ bool car::propagate()
 
 bool car::is_inductive()
 {
-    // TODO
-}
+    assert( 1 <= depth() );
 
-literal car::prime_literal( literal lit ) const
-{
-    const auto [ type, pos ] = _system->get_var_info( lit.var() );
-    assert( type == var_type::state );
+    const auto clausify_frame_negation = [ & ]( const cube_set& cubes )
+    {
+        const auto x = literal{ _store->make() };
 
-    return lit.substitute( _system->next_state_vars().nth( pos ) );
+        auto cnf = cnf_formula{};
+
+        cnf.add_clause( x );
+
+        auto ys = std::vector< literal >{};
+
+        for ( const auto& c : cubes )
+        {
+            const auto y = ys.emplace_back( _store->make() );
+
+            for ( const auto lit : c.literals() )
+                cnf.add_clause( !y, lit );
+
+            auto clause = std::vector< literal >{};
+            clause.reserve( c.literals().size() + 1 );
+
+            for ( const auto lit : c.literals() )
+                clause.push_back( !lit );
+
+            clause.push_back( y );
+
+            cnf.add_clause( clause );
+        }
+
+        auto clause = std::vector< literal >{};
+        clause.reserve( ys.size() + 1 );
+
+        clause.push_back( !x );
+
+        for ( const auto y : ys )
+            clause.push_back( y );
+
+        cnf.add_clause( clause );
+
+        for ( const auto y : ys )
+            cnf.add_clause( !y, x );
+
+        return cnf;
+    };
+
+    auto checker = solver{};
+
+    checker.assert_formula( clausify_frame_negation( _trace_blocked_cubes[ 0 ] ) );
+
+    for ( int i = 1; i <= depth(); ++i )
+    {
+        const auto act = literal{ _store->make() };
+
+        for ( const auto& c : _trace_blocked_cubes[ i ] )
+            checker.assert_formula( c.negate().activate( act.var() ) );
+
+        if ( !checker.query().assume( act ).is_sat() )
+            return true;
+
+        if ( i < depth() )
+        {
+            checker.assert_formula( cnf_formula::clause( std::vector{ !act } ) );
+            checker.assert_formula( clausify_frame_negation( _trace_blocked_cubes[ i ] ) );
+        }
+    }
+
+    return false;
 }
 
 bool car::is_state_cube( std::span< const literal > literals ) const
@@ -379,9 +493,15 @@ bool car::is_state_cube( std::span< const literal > literals ) const
     return std::ranges::all_of( literals, [ & ]( literal lit ){ return is_state_var( lit.var() ); } );
 }
 
-bool car::is_state_cube( const cube& cube ) const
+bool car::is_next_state_cube( std::span< const literal > literals ) const
 {
-    return is_state_cube( cube.literals() );
+    const auto is_next_state_var = [ & ]( variable var )
+    {
+        const auto [ type, _ ] = _system->get_var_info( var );
+        return type == var_type::next_state;
+    };
+
+    return std::ranges::all_of( literals, [ & ]( literal lit ){ return is_next_state_var( lit.var() ); } );
 }
 
 void car::log_trace_content() const
@@ -406,7 +526,7 @@ void car::log_cotrace_content() const
 
 transition_system backward_car::reverse_system( const transition_system& system )
 {
-    // TODO
+    return system; // TODO
 }
 
 } // namespace geyser::car

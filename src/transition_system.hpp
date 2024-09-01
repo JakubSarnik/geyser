@@ -31,8 +31,6 @@ class transition_system
     variable_range _next_state_vars;
     variable_range _aux_vars;
 
-    // TODO: We actually assume init to be a single cube in PDR and CAR.
-    //       Reflect this here.
     cnf_formula _init;
     cnf_formula _trans;
     cnf_formula _error;

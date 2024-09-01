@@ -36,6 +36,7 @@ int main( int argc, char** argv )
 {
     auto opts = parse_cli( argc, argv );
 
+    // TODO: Implement --help!
     if ( !opts.has_value() )
     {
         std::cerr << "error: " << opts.error() << "\n";

@@ -1,94 +1,54 @@
 #include "common.hpp"
-#include "engine/pdr.hpp"
+#include "engine/car.hpp"
 
 using namespace geyser;
-using namespace geyser::pdr;
+using namespace geyser::car;
 
-TEST_CASE( "CTI pool works" )
+// Almost the same tests as for PDR.
+
+TEST_CASE( "Cotrace pool works" )
 {
     const auto c0 = cube{ {} };
     const auto c1 = cube{ to_literals( { 1, 2, 3 } ) };
     const auto c2 = cube{ to_literals( { 1, -2, 3 } ) };
     const auto c3 = cube{ to_literals( { -10, 12 } ) };
 
-    auto pool = cti_pool{};
+    auto pool = cotrace_pool{};
 
-    const auto check_handle = [ & ]( cti_handle h,
-            const cube& s, const cube& i, std::optional< cti_handle > succ )
+    const auto check_handle = [ & ]( bad_cube_handle h,
+                                     const cube& s, const cube& i, std::optional< bad_cube_handle > succ )
     {
         REQUIRE( pool.get( h ).state_vars() == s );
         REQUIRE( pool.get( h ).input_vars() == i );
         REQUIRE( pool.get( h ).successor() == succ );
     };
 
-    {
-        const auto h1 = pool.make( c1, c2 );
+    const auto h1 = pool.make( c1, c1 );
 
-        check_handle( h1, c1, c2, std::nullopt );
+    check_handle( h1, c1, c1, std::nullopt );
 
-        const auto h2 = pool.make( c0, c3, h1 );
+    const auto h2 = pool.make( c2, c1, std::nullopt );
 
-        check_handle( h1, c1, c2, std::nullopt );
-        check_handle( h2, c0, c3, h1 );
-    }
+    check_handle( h1, c1, c1, std::nullopt );
+    check_handle( h2, c2, c1, std::nullopt );
 
-    pool.flush();
+    const auto h3 = pool.make( c2, c3, h1 );
 
-    {
-        const auto h1 = pool.make( c3, c2 );
+    check_handle( h1, c1, c1, std::nullopt );
+    check_handle( h2, c2, c1, std::nullopt );
+    check_handle( h3, c2, c3, h1 );
 
-        check_handle( h1, c3, c2, std::nullopt );
+    const auto h4 = pool.make( c3, c1, h1 );
 
-        const auto h2 = pool.make( c3, c3, h1 );
-
-        check_handle( h1, c3, c2, std::nullopt );
-        check_handle( h2, c3, c3, h1 );
-
-        const auto h3 = pool.make( c1, c2, h1 );
-
-        check_handle( h1, c3, c2, std::nullopt );
-        check_handle( h2, c3, c3, h1 );
-        check_handle( h3, c1, c2, h1 );
-    }
-
-    pool.flush();
-
-    {
-        const auto h1 = pool.make( c0, c0 );
-
-        check_handle( h1, c0, c0, std::nullopt );
-    }
-
-    pool.flush();
-
-    {
-        const auto h1 = pool.make( c1, c1 );
-
-        check_handle( h1, c1, c1, std::nullopt );
-
-        const auto h2 = pool.make( c2, c1, std::nullopt );
-
-        check_handle( h1, c1, c1, std::nullopt );
-        check_handle( h2, c2, c1, std::nullopt );
-
-        const auto h3 = pool.make( c2, c3, h1 );
-
-        check_handle( h1, c1, c1, std::nullopt );
-        check_handle( h2, c2, c1, std::nullopt );
-        check_handle( h3, c2, c3, h1 );
-
-        const auto h4 = pool.make( c3, c1, h1 );
-
-        check_handle( h1, c1, c1, std::nullopt );
-        check_handle( h2, c2, c1, std::nullopt );
-        check_handle( h3, c2, c3, h1 );
-        check_handle( h4, c3, c1, h1 );
-    }
+    check_handle( h1, c1, c1, std::nullopt );
+    check_handle( h2, c2, c1, std::nullopt );
+    check_handle( h3, c2, c3, h1 );
+    check_handle( h4, c3, c1, h1 );
 }
 
-TEST_CASE( "Proof obligations are ordered by level in PDR" )
+TEST_CASE( "Proof obligations are ordered by level in CAR" )
 {
-    auto pool = cti_pool{};
+    auto pool = cotrace_pool{};
 
     const auto c = cube{ {} };
 
@@ -96,11 +56,11 @@ TEST_CASE( "Proof obligations are ordered by level in PDR" )
     const auto h2 = pool.make( c, c, {} );
     const auto h3 = pool.make( c, c, {} );
 
-    const auto po1 = proof_obligation{ h1, 0 };
-    const auto po2 = proof_obligation{ h1, 1 };
-    const auto po3 = proof_obligation{ h2, 1 };
-    const auto po4 = proof_obligation{ h3, 0 };
-    const auto po5 = proof_obligation{ h3, 2 };
+    const auto po1 = proof_obligation{ h1, 0, 0 };
+    const auto po2 = proof_obligation{ h1, 1, 1 };
+    const auto po3 = proof_obligation{ h2, 1, 1 };
+    const auto po4 = proof_obligation{ h3, 0, 2 };
+    const auto po5 = proof_obligation{ h3, 2, 1 };
 
     REQUIRE( po1 < po2 );
     REQUIRE( po1 < po3 );
@@ -112,12 +72,12 @@ TEST_CASE( "Proof obligations are ordered by level in PDR" )
     REQUIRE( po4 < po5 );
 }
 
-TEST_CASE( "PDR works on a simple system" )
+TEST_CASE( "Forward CAR works on a simple system" )
 {
     auto store = variable_store{};
     const auto opts = options{ {}, "pdr", verbosity_level::silent, {} };
 
-    auto engine = geyser::pdr::pdr{ opts, store };
+    auto engine = forward_car{ opts, store };
 
     SECTION( "Unsafe initial state" )
     {

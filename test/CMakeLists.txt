@@ -6,6 +6,7 @@ add_executable(test
         aiger_builder.cpp
         options.cpp
         pdr.cpp
+        car.cpp
 )
 
 target_link_libraries(test PRIVATE Catch2::Catch2WithMain)

@@ -318,7 +318,10 @@ is_inductive() -> bool:
   # The negations are shared between the subsequent calls, but each non-negated
   # frame must be deactivated after each query.
 
-  checker.add_formula( clausify_frame_negation( F[ 0 ] ) )
+  # As a special case, R_0 = I. We assume I to be a cube, hence its negation is
+  # a single clause.
+
+  checker.add_clause( -I )
 
   for i in 1 .. k:
 

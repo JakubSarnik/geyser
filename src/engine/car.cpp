@@ -321,17 +321,10 @@ std::vector< literal > car::get_minimal_core( std::span< const literal > seed,
     {
         core.erase( std::remove( core.begin(), core.end(), lit ), core.end() );
 
-        if ( !requery( core ) )
-        {
-            core.erase( std::remove_if( core.begin(), core.end(), [ & ]( literal lit )
-            {
-                return !_solver.is_in_core( lit );
-            } ), core.end() );
-        }
-        else
-        {
+        if ( requery( core ) )
             core.push_back( lit );
-        }
+        else
+            core = _solver.get_core( core );
     }
 
     return core;
@@ -460,7 +453,20 @@ bool car::is_inductive()
 
     auto checker = solver{};
 
-    checker.assert_formula( clausify_frame_negation( _trace_blocked_cubes[ 0 ] ) );
+    // Assuming init is a cube here. To assume -R_0 = -I, simply assume a clause
+    // that is the negation of I.
+
+    {
+        // Bleh, see the todo in transition_system.
+
+        auto clause = std::vector< literal >{};
+
+        for ( const auto lit : _system->init().literals() )
+            if ( lit != literal::separator )
+                clause.push_back( !lit );
+
+        checker.assert_formula( cnf_formula::clause( clause ) );
+    }
 
     for ( int i = 1; i <= depth(); ++i )
     {

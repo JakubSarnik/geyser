@@ -6,6 +6,7 @@
 #include "engine/base.hpp"
 #include "engine/bmc.hpp"
 #include "engine/pdr.hpp"
+#include "engine/car.hpp"
 #include <string>
 #include <iostream>
 #include <map>
@@ -23,6 +24,8 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
         return std::make_unique< bmc >( opts, store );
     if ( name == "pdr" )
         return std::make_unique< pdr::pdr >( opts, store );
+    if ( name == "car" )
+        return std::make_unique< car::forward_car >( opts, store );
 
     return nullptr;
 }

@@ -127,6 +127,9 @@ class pdr : public engine
     cnf_formula _activated_trans;
     cnf_formula _activated_error;
 
+    // The cube corresponding to _init, which is assumed to be a single cube.
+    cube _init_cube;
+
     using cube_set = std::vector< cube >;
 
     std::vector< cube_set > _trace_blocked_cubes;

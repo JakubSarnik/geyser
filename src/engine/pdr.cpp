@@ -23,6 +23,12 @@ void pdr::initialize()
     _activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
     _activated_trans = _system->trans().activate( _transition_activator.var() );
     _activated_error = _system->error().activate( _error_activator.var() );
+
+    // We assume that initial states are given as a single cube. This is the
+    // case when no invariant constraints are present in the Aiger input, which
+    // we assume for the sake of simplicity of implementation.
+
+    _init_cube = formula_as_cube( _system->init() );
 }
 
 result pdr::check( int bound )
@@ -236,13 +242,8 @@ bool pdr::is_already_blocked( const proof_obligation& po )
 
 bool pdr::intersects_initial_states( std::span< const literal > c )
 {
-    // Note that this would not work if we had initial formula more
-    // complex than a cube (i.e. with invariance constraints)!
-
-    const auto& init_lits = _system->init().literals();
-
     for ( const auto lit : c )
-        if ( std::find( init_lits.begin(), init_lits.end(), !lit ) != init_lits.end() )
+        if ( _init_cube.contains( !lit ) )
             return false;
 
     return true;

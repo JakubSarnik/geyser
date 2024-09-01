@@ -5,6 +5,7 @@
 #include <vector>
 #include <concepts>
 #include <algorithm>
+#include <ranges>
 #include <span>
 #include <iterator>
 #include <optional>
@@ -312,6 +313,8 @@ class cube
     std::vector< literal > _literals;
 
 public:
+    cube() = default;
+
     explicit cube( std::vector< literal > literals ) : _literals{ std::move( literals ) }
     {
         std::ranges::sort( _literals, cube_literal_lt );
@@ -345,19 +348,25 @@ public:
         return f;
     }
 
-    // Returns the first literal corresponding to a variable var in the cube.
-    // This is typically called when there is at most a single literal for a
-    // given variable.
+    [[nodiscard]]
+    bool contains( literal lit ) const
+    {
+        return std::ranges::binary_search( _literals, lit, cube_literal_lt );
+    }
+
+    // Assuming the cube doesn't contain a pair of literals with the same
+    // variable but different polarities, return the literal in which the given
+    // variable appears in the cube (or nothing if the variable doesn't appear
+    // at all).
     [[nodiscard]]
     std::optional< literal > find( variable var ) const
     {
-        // We could do a binary search here, but that's more complex code than
-        // necessary for the typical use case of this function, i.e. building
-        // a counterexample trace.
+        const auto lit = literal{ var };
 
-        for ( const auto lit : _literals )
-            if ( lit.var() == var )
-                return literal{ var, !lit.sign() };
+        if ( contains( lit ) )
+            return lit;
+        if ( contains( !lit ) )
+            return !lit;
 
         return {};
     }
@@ -375,6 +384,20 @@ inline std::string cube_to_string( const cube& c )
     }
 
     return res;
+}
+
+inline cube formula_as_cube( const cnf_formula& f )
+{
+    // Assert that this is indeed a cube.
+    assert( std::ranges::count( f.literals(), literal::separator ) == f.literals().size() / 2 );
+
+    auto lits = std::vector< literal >{};
+
+    for ( const auto lit : f.literals() )
+        if ( lit != literal::separator )
+            lits.push_back( lit );
+
+    return cube{ lits };
 }
 
 } // namespace geyser

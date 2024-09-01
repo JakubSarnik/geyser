@@ -24,6 +24,8 @@ void car::initialize()
     _activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
     _activated_trans = _system->trans().activate( _transition_activator.var() );
     _activated_error = _system->error().activate( _error_activator.var() );
+
+    _init_cube = formula_as_cube( _system->init() );
 }
 
 void car::refresh_solver()
@@ -453,20 +455,7 @@ bool car::is_inductive()
 
     auto checker = solver{};
 
-    // Assuming init is a cube here. To assume -R_0 = -I, simply assume a clause
-    // that is the negation of I.
-
-    {
-        // Bleh, see the todo in transition_system.
-
-        auto clause = std::vector< literal >{};
-
-        for ( const auto lit : _system->init().literals() )
-            if ( lit != literal::separator )
-                clause.push_back( !lit );
-
-        checker.assert_formula( cnf_formula::clause( clause ) );
-    }
+    checker.assert_formula( _init_cube.negate() );
 
     for ( int i = 1; i <= depth(); ++i )
     {

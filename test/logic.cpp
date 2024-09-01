@@ -657,6 +657,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     {
         const auto c = cube{ {} };
 
+        REQUIRE( !c.contains( x ) );
+        REQUIRE( !c.contains( y ) );
+        REQUIRE( !c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( !c.contains( !z ) );
+
         REQUIRE( !c.find( v1 ).has_value() );
         REQUIRE( !c.find( v2 ).has_value() );
         REQUIRE( !c.find( v3 ).has_value() );
@@ -665,6 +672,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     SECTION( "Single positive literal" )
     {
         const auto c = cube{ { y } };
+
+        REQUIRE( !c.contains( x ) );
+        REQUIRE( c.contains( y ) );
+        REQUIRE( !c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( !c.contains( !z ) );
 
         REQUIRE( !c.find( v1 ).has_value() );
         REQUIRE( c.find( v2 ).has_value() );
@@ -676,6 +690,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     {
         const auto c = cube{ { !y } };
 
+        REQUIRE( !c.contains( x ) );
+        REQUIRE( !c.contains( y ) );
+        REQUIRE( !c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( c.contains( !y ) );
+        REQUIRE( !c.contains( !z ) );
+
         REQUIRE( !c.find( v1 ).has_value() );
         REQUIRE( c.find( v2 ).has_value() );
         REQUIRE( *c.find( v2 ) == !y );
@@ -685,6 +706,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     SECTION( "Two literals, in order" )
     {
         const auto c = cube{ { x, z } };
+
+        REQUIRE( c.contains( x ) );
+        REQUIRE( !c.contains( y ) );
+        REQUIRE( c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( !c.contains( !z ) );
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
@@ -697,6 +725,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     {
         const auto c = cube{ { z, x } };
 
+        REQUIRE( c.contains( x ) );
+        REQUIRE( !c.contains( y ) );
+        REQUIRE( c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( !c.contains( !z ) );
+
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
         REQUIRE( !c.find( v2 ).has_value() );
@@ -707,6 +742,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     SECTION( "Three literals, all positive" )
     {
         const auto c = cube{ { x, y, z } };
+
+        REQUIRE( c.contains( x ) );
+        REQUIRE( c.contains( y ) );
+        REQUIRE( c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( !c.contains( !z ) );
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
@@ -720,6 +762,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     {
         const auto c = cube{ { !x, !y, !z } };
 
+        REQUIRE( !c.contains( x ) );
+        REQUIRE( !c.contains( y ) );
+        REQUIRE( !c.contains( z ) );
+        REQUIRE( c.contains( !x ) );
+        REQUIRE( c.contains( !y ) );
+        REQUIRE( c.contains( !z ) );
+
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == !x );
         REQUIRE( c.find( v2 ).has_value() );
@@ -731,6 +780,13 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     SECTION( "Three literals, mixed 1" )
     {
         const auto c = cube{ { !x, y, !z } };
+
+        REQUIRE( !c.contains( x ) );
+        REQUIRE( c.contains( y ) );
+        REQUIRE( !c.contains( z ) );
+        REQUIRE( c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( c.contains( !z ) );
 
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == !x );
@@ -744,11 +800,30 @@ TEST_CASE( "Literals are correctly found in ordered cubes" )
     {
         const auto c = cube{ { x, y, !z } };
 
+        REQUIRE( c.contains( x ) );
+        REQUIRE( c.contains( y ) );
+        REQUIRE( !c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( c.contains( !z ) );
+
         REQUIRE( c.find( v1 ).has_value() );
         REQUIRE( *c.find( v1 ) == x );
         REQUIRE( c.find( v2 ).has_value() );
         REQUIRE( *c.find( v2 ) == y );
         REQUIRE( c.find( v3 ).has_value() );
         REQUIRE( *c.find( v3 ) == !z );
+    }
+
+    SECTION( "Contains only, literals of mixed polarity" )
+    {
+        const auto c = cube{ { x, y, !z, z } };
+
+        REQUIRE( c.contains( x ) );
+        REQUIRE( c.contains( y ) );
+        REQUIRE( c.contains( z ) );
+        REQUIRE( !c.contains( !x ) );
+        REQUIRE( !c.contains( !y ) );
+        REQUIRE( c.contains( !z ) );
     }
 }

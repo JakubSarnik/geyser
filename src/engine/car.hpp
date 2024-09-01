@@ -105,6 +105,8 @@ class car : public engine
     cnf_formula _activated_trans;
     cnf_formula _activated_error;
 
+    cube _init_cube;
+
     using cube_set = std::vector< cube >;
     using handle_set = std::vector< bad_cube_handle >;
 

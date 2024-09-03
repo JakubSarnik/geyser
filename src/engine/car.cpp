@@ -171,7 +171,7 @@ std::optional< counterexample > car::solve_obligation( const proof_obligation& s
 
             // TODO: Is this good in CAR?
             // if ( po.level() < depth() )
-            //     min_queue.emplace( po.handle(), po.level() + 1 );
+            //     min_queue.emplace( po.handle(), po.level() + 1, po.colevel() );
         }
     }
 

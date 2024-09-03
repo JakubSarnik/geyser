@@ -105,7 +105,9 @@ class car : public engine
     cnf_formula _activated_trans;
     cnf_formula _activated_error;
 
-    cube _init_cube;
+    // The negation of the init formula. How it's build differs between forward
+    // and backward modes.
+    cnf_formula _init_negated;
 
     using cube_set = std::vector< cube >;
     using handle_set = std::vector< bad_cube_handle >;
@@ -188,6 +190,8 @@ class car : public engine
     void log_trace_content() const;
     void log_cotrace_content() const;
 
+    cnf_formula negate_cnf( const cnf_formula& f );
+
 public:
     car( const options& opts, variable_store& store, bool forward )
         : engine( opts, store ), _transition_activator{ _store->make( "ActT" ) },
@@ -205,7 +209,7 @@ public:
 
 class backward_car : public car
 {
-    transition_system reverse_system( const transition_system& system );
+    static transition_system reverse_system( const transition_system& system );
 
 public:
     backward_car( const options& opts, variable_store& store )

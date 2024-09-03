@@ -24,8 +24,10 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
         return std::make_unique< bmc >( opts, store );
     if ( name == "pdr" )
         return std::make_unique< pdr::pdr >( opts, store );
-    if ( name == "car" )
+    if ( name == "car" || name == "fcar" )
         return std::make_unique< car::forward_car >( opts, store );
+    if ( name == "bcar" )
+        return std::make_unique< car::backward_car >( opts, store );
 
     return nullptr;
 }

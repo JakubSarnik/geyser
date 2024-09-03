@@ -25,7 +25,11 @@ void car::initialize()
     _activated_trans = _system->trans().activate( _transition_activator.var() );
     _activated_error = _system->error().activate( _error_activator.var() );
 
-    _init_cube = formula_as_cube( _system->init() );
+    // In the backward mode, the initial formula is not in general a cube.
+    if ( _forward )
+        _init_negated = formula_as_cube( _system->init() ).negate();
+    else
+        _init_negated = negate_cnf( _system->init() );
 }
 
 void car::refresh_solver()
@@ -214,9 +218,16 @@ counterexample car::build_counterexample( bad_cube_handle initial )
         // counterexample and the real initial state is the penultimate entry.
 
         assert( previous.has_value() );
-
         auto first = get_vars( _system->state_vars(), previous->state_vars() ); // NOLINT
+
+        // The last element of the inputs is not needed, since the initial
+        // formula depends only on the state variables, not inputs. Unlike it,
+        // the error formula does depend on input variable valuation, so we
+        // must add the inputs of the terminal state after reversing instead.
+
+        inputs.pop_back();
         std::ranges::reverse( inputs );
+        inputs.emplace_back( get_vars( _system->input_vars(), _cotrace.get( initial ).input_vars() ) );
 
         return counterexample{ std::move( first ), std::move( inputs ) };
     }
@@ -455,7 +466,7 @@ bool car::is_inductive()
 
     auto checker = solver{};
 
-    checker.assert_formula( _init_cube.negate() );
+    checker.assert_formula( _init_negated );
 
     for ( int i = 1; i <= depth(); ++i )
     {
@@ -519,9 +530,91 @@ void car::log_cotrace_content() const
     log_line_loud( "{}", line );
 }
 
+cnf_formula car::negate_cnf( const cnf_formula& f )
+{
+    // Given a CNF formula f such as
+    //   (a \/ -b \/ c) /\ (-c \/ d) /\ (a \/ b \/ c),
+    // we can do a trivial Tseiting encoding of it by adding a new variable x
+    // for the whole formula and y1, ..., yn for the individual clauses. First,
+    // add constraints for each clause, e.g.
+    //   y1 -> (a \/ -b \/ c) = -y1 \/ a \/ -b \/ c
+    //   a -> y1, -b -> y1, c -> y1 = -a \/ y1, -b \/ y1, c \/ y1
+    // Then add constraints specifying x <-> cy /\ ... /\ cy, e.g.
+    //   x -> y1, x -> y2, x -> y3 = -x \/ y1, -x \/ y2, -x \/ y3
+    //   y1 /\ y2 /\ y3 -> x = -y1 \/ -y2 \/ -y3 \/ x
+    // Finally add -x, saying that the whole formula is false.
+    // (Yes, this is almost the same as clausify_frame_negation above, but the
+    // negations are the other way around, sigh...)
+    // TODO: Somehow deduplicate.
+
+    auto negation = cnf_formula{};
+    const auto x = literal{ _store->make() };
+
+    negation.add_clause( !x );
+
+    // If only we had C++23 ranges::to.
+
+    auto split = f.literals()
+               | std::views::split( literal::separator )
+               | std::views::transform( []( const auto& subrange )
+                 {
+                   return std::vector< literal >( subrange.begin(), subrange.end() );
+                 } );
+
+    const auto clauses = std::vector( split.begin(), split.end() );
+
+    auto ys = std::vector< literal >{};
+
+    for ( const auto& c : clauses )
+    {
+        const auto y = ys.emplace_back( _store->make() );
+
+        for ( const auto lit : c )
+            negation.add_clause( !lit, y );
+
+        auto clause = std::vector< literal >{};
+
+        clause.reserve( c.size() + 1 );
+        clause.push_back( !y );
+
+        for ( const auto lit : c )
+            clause.push_back( lit );
+
+        negation.add_clause( clause );
+    }
+
+    for ( const auto y : ys )
+        negation.add_clause( !x, y );
+
+    auto clause = std::vector< literal >{};
+    clause.reserve( ys.size() + 1 );
+
+    for ( const auto y : ys )
+        clause.push_back( !y );
+
+    clause.push_back( x );
+
+    negation.add_clause( clause );
+
+    return negation;
+}
+
 transition_system backward_car::reverse_system( const transition_system& system )
 {
-    return system; // TODO
+    const auto reversed_trans = system.trans().map( [ & ]( literal lit )
+    {
+        const auto [ type, pos ] = system.get_var_info( lit.var() );
+
+        if ( type == var_type::state )
+            return system.prime( lit );
+        if ( type == var_type::next_state )
+            return system.unprime( lit );
+
+        return lit;
+    } );
+
+    return transition_system{ system.input_vars(), system.state_vars(), system.next_state_vars(),
+                              system.aux_vars(), system.error(), reversed_trans, system.init() };
 }
 
 } // namespace geyser::car

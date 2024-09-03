@@ -512,7 +512,7 @@ bool car::is_next_state_cube( std::span< const literal > literals ) const
 
 void car::log_trace_content() const
 {
-    auto line = std::format( "F[{}]:", depth() );
+    auto line = std::format( "{} F:", depth() );
 
     for ( int i = 1; i <= depth(); ++i )
         line += std::format( " {}", _trace_blocked_cubes[ i ].size() );
@@ -522,7 +522,7 @@ void car::log_trace_content() const
 
 void car::log_cotrace_content() const
 {
-    auto line = std::format( "B[{}]:", depth() );
+    auto line = std::format( "{} B:", depth() );
 
     for ( int i = 1; i <= codepth(); ++i )
         line += std::format( " {}", _cotrace_found_cubes[ i ].size() );

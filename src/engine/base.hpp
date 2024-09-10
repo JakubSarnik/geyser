@@ -2,7 +2,6 @@
 
 #include "logic.hpp"
 #include "transition_system.hpp"
-#include "options.hpp"
 #include <string>
 #include <vector>
 #include <variant>
@@ -32,22 +31,9 @@ public:
 
 using result = std::variant< ok, unknown, counterexample >;
 
-class engine
+class engine // NOLINT (default virtual destructor is ok)
 {
-protected:
-    // TODO: Remove this, make the class purely abstract.
-    const options* _opts;
-    variable_store* _store;
-
 public:
-    engine( const options& opts, variable_store& store ) : _opts{ &opts }, _store{ &store } {}
-
-    engine( const engine& ) = delete;
-    engine( engine&& ) = delete;
-
-    engine& operator=( const engine& ) = delete;
-    engine& operator=( engine&& ) = delete;
-
     virtual ~engine() = default;
 
     [[nodiscard]] virtual result run( const transition_system& system ) = 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.hpp"
+#include "options.hpp"
 #include "solver.hpp"
 #include <optional>
 #include <span>
@@ -96,6 +97,9 @@ public:
 
 class car : public engine
 {
+    const options* _opts;
+    variable_store* _store;
+
     solver _solver;
     const transition_system* _system = nullptr;
 
@@ -195,7 +199,7 @@ class car : public engine
 
 public:
     car( const options& opts, variable_store& store, bool forward )
-        : engine( opts, store ), _transition_activator{ _store->make( "ActT" ) },
+        : _opts{ &opts }, _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
           _error_activator{ _store->make( "ActE" ) }, _forward{ forward } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;

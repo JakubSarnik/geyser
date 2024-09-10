@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.hpp"
+#include "options.hpp"
 #include "solver.hpp"
 #include <optional>
 #include <memory>
@@ -11,13 +12,14 @@ namespace geyser
 
 class bmc : public engine
 {
-    using engine::engine;
-
     using vars = std::vector< variable_range >;
 
     // Each solver_refresh_rate iterations, reset the solver by throwing away
     // all the accumulated (and disabled) error formulas.
     constexpr static int solver_refresh_rate = 100;
+
+    const options* _opts;
+    variable_store* _store;
 
     solver _solver;
     const transition_system* _system = nullptr;
@@ -60,6 +62,8 @@ class bmc : public engine
     cnf_formula make_error( int step );
 
 public:
+    bmc( const options& opts, variable_store& store ) : _opts{ &opts }, _store{ &store } {}
+
     [[nodiscard]] result run( const transition_system& system ) override;
 };
 

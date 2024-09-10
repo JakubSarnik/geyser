@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.hpp"
+#include "options.hpp"
 #include "solver.hpp"
 #include <algorithm>
 #include <memory>
@@ -118,6 +119,9 @@ public:
 
 class pdr : public engine
 {
+    const options* _opts;
+    variable_store* _store;
+
     solver _solver;
     const transition_system* _system = nullptr;
 
@@ -202,7 +206,7 @@ class pdr : public engine
 
 public:
     pdr( const options& opts, variable_store& store )
-        : engine( opts, store ), _transition_activator{ _store->make( "ActT" ) },
+        : _opts{ &opts }, _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
           _error_activator{ _store->make( "ActE" ) } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;

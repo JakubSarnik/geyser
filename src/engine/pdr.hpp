@@ -7,6 +7,7 @@
 #include <vector>
 #include <span>
 #include <concepts>
+#include <format>
 
 namespace geyser::pdr
 {

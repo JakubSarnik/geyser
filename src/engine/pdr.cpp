@@ -1,4 +1,5 @@
 #include "pdr.hpp"
+#include "logger.hpp"
 #include <queue>
 #include <ranges>
 #include <string>
@@ -94,7 +95,7 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
         {
             const auto [ c, i ] = generalize_inductive( po );
 
-            log_line_debug( "{}: {}", i, cube_to_string( c ) );
+            logger::log_line_debug( "{}: {}", i, cube_to_string( c ) );
             add_blocked_at( c, i );
 
             if ( po.level() < depth() )
@@ -188,7 +189,7 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
 counterexample pdr::build_counterexample( cti_handle initial )
 {
-    log_line_loud( "Found a counterexample at k = {}", depth() );
+    logger::log_line_loud( "Found a counterexample at k = {}", depth() );
 
     // CTI entries don't necessarily contain all the variables. If a variable
     // doesn't appear in any literal, its value is not important, so we might
@@ -320,7 +321,7 @@ bool pdr::propagate()
 
 void pdr::refresh_solver()
 {
-    log_line_loud( "Refreshing the solver after {} queries", _queries );
+    logger::log_line_loud( "Refreshing the solver after {} queries", _queries );
 
     assert( _system );
 
@@ -356,7 +357,7 @@ void pdr::log_trace_content() const
     for ( int i = 1; i <= depth(); ++i )
         line += std::format( " {}", _trace_blocked_cubes[ i ].size() );
 
-    log_line_loud( "{}", line );
+    logger::log_line_loud( "{}", line );
 }
 
 } // namespace geyser::pdr

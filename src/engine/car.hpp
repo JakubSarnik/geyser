@@ -5,6 +5,7 @@
 #include <optional>
 #include <span>
 #include <concepts>
+#include <format>
 
 namespace geyser::car
 {

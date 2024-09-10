@@ -1,4 +1,5 @@
 #include "bmc.hpp"
+#include "logger.hpp"
 #include <limits>
 #include <format>
 #include <exception>
@@ -37,7 +38,7 @@ result bmc::run( const transition_system& system )
 //   Init(X_0) /\ Trans(X_0, Y_0, X_1) /\ ... /\ Trans(X_{bound - 1}, Y_{bound - 1}, X_{bound})
 void bmc::refresh_solver( int bound )
 {
-    log_line_loud( "Refreshing the solver after {} steps", bound );
+    logger::log_line_loud( "Refreshing the solver after {} steps", bound );
 
     assert( bound >= 0 );
     assert( _system );
@@ -55,7 +56,7 @@ void bmc::refresh_solver( int bound )
 //   Init(X_0) /\ Trans(X_0, Y_0, X_1) /\ ... /\ Trans(X_{step - 1}, Y_{step - 1}, X_{step}) /\ Error(X_{step})
 std::optional< counterexample > bmc::check_for( int step )
 {
-    log_line_loud( "BMC entering step {}", step );
+    logger::log_line_loud( "BMC entering step {}", step );
 
     assert( step >= 0 );
 
@@ -87,7 +88,7 @@ std::optional< counterexample > bmc::check_for( int step )
 
 counterexample bmc::build_counterexample( int step )
 {
-    log_line_loud( "Found a counterexample at step {}", step );
+    logger::log_line_loud( "Found a counterexample at step {}", step );
 
     assert( step >= 0 );
     assert( !_versioned_state_vars.empty() );
@@ -205,8 +206,8 @@ cnf_formula bmc::make_error( int step )
             case var_type::auxiliary:
                 return lit.substitute( aux.nth( pos ) );
             default:
-                log_line_loud( "An unexpected variable ({}) has occurred in the base error formula",
-                               std::to_underlying( type ) );
+                logger::log_line_loud( "An unexpected variable ({}) has occurred in the base error formula",
+                                       std::to_underlying( type ) );
                 std::terminate(); // Unreachable
         }
     }).activate( activator );

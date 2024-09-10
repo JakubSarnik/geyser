@@ -1,4 +1,5 @@
 #include "car.hpp"
+#include "logger.hpp"
 #include <queue>
 #include <ranges>
 #include <string>
@@ -34,7 +35,7 @@ void car::initialize()
 
 void car::refresh_solver()
 {
-    log_line_loud( "Refreshing the solver after {} queries", _queries );
+    logger::log_line_loud( "Refreshing the solver after {} queries", _queries );
 
     assert( _system );
 
@@ -156,7 +157,7 @@ std::optional< counterexample > car::solve_obligation( const proof_obligation& s
             const auto pred = get_predecessor( po );
             const auto ix = po.colevel() + 1;
 
-            log_line_debug( "B[{}]: {}", ix, cube_to_string( _cotrace.get( pred ).state_vars() ) );
+            logger::log_line_debug( "B[{}]: {}", ix, cube_to_string( _cotrace.get( pred ).state_vars() ) );
             add_reaching_at( pred, ix );
 
             min_queue.emplace( pred, po.level() - 1, ix );
@@ -166,7 +167,7 @@ std::optional< counterexample > car::solve_obligation( const proof_obligation& s
         {
             auto c = generalize_blocked( po );
 
-            log_line_debug( "F[{}]: {}", po.level(), cube_to_string( c ) );
+            logger::log_line_debug( "F[{}]: {}", po.level(), cube_to_string( c ) );
             add_blocked_at( c, po.level() );
 
             // TODO: Is this good in CAR?
@@ -180,7 +181,7 @@ std::optional< counterexample > car::solve_obligation( const proof_obligation& s
 
 counterexample car::build_counterexample( bad_cube_handle initial )
 {
-    log_line_loud( "Found a counterexample at k = {}", depth() );
+    logger::log_line_loud( "Found a counterexample at k = {}", depth() );
 
     auto get_vars = []( variable_range range, const cube& val )
     {
@@ -517,7 +518,7 @@ void car::log_trace_content() const
     for ( int i = 1; i <= depth(); ++i )
         line += std::format( " {}", _trace_blocked_cubes[ i ].size() );
 
-    log_line_loud( "{}", line );
+    logger::log_line_loud( "{}", line );
 }
 
 void car::log_cotrace_content() const
@@ -527,7 +528,7 @@ void car::log_cotrace_content() const
     for ( int i = 1; i <= codepth(); ++i )
         line += std::format( " {}", _cotrace_found_cubes[ i ].size() );
 
-    log_line_loud( "{}", line );
+    logger::log_line_loud( "{}", line );
 }
 
 cnf_formula car::negate_cnf( const cnf_formula& f )

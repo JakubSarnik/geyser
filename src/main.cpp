@@ -3,6 +3,7 @@
 #include "logic.hpp"
 #include "aiger_builder.hpp"
 #include "witness_writer.hpp"
+#include "logger.hpp"
 #include "engine/base.hpp"
 #include "engine/bmc.hpp"
 #include "engine/pdr.hpp"
@@ -45,17 +46,13 @@ int main( int argc, char** argv )
         return 1;
     }
 
-    const auto trace = [ & ]( const std::string& s )
-    {
-        if ( opts->verbosity >= verbosity_level::loud )
-            std::cout << s << std::flush;
-    };
+    logger::set_verbosity( opts->verbosity );
 
     auto aig = make_aiger();
 
     const char* msg = nullptr;
 
-    trace( "Loading aig from file... " );
+    logger::log_loud( "Loading aig from file... " );
 
     if ( opts->input_file.has_value() )
         msg = aiger_open_and_read_from_file( aig.get(), opts->input_file->c_str() );
@@ -68,8 +65,8 @@ int main( int argc, char** argv )
         return 1;
     }
 
-    trace( "OK\n" );
-    trace( "Loading the engine... " );
+    logger::log_loud( "OK\n" );
+    logger::log_loud( "Loading the engine... " );
 
     auto store = variable_store{};
     auto engine = get_engine( *opts, store );
@@ -80,8 +77,8 @@ int main( int argc, char** argv )
         return 1;
     }
 
-    trace( "OK\n" );
-    trace( "Building the transition system... " );
+    logger::log_loud( "OK\n" );
+    logger::log_loud( "Building the transition system... " );
 
     auto system = builder::build_from_aiger( store, *aig );
 
@@ -91,13 +88,13 @@ int main( int argc, char** argv )
         return 1;
     }
 
-    trace( "OK\n" );
-    trace( "Running...\n\n" );
+    logger::log_loud( "OK\n" );
+    logger::log_loud( "Running...\n\n" );
 
     const auto res = engine->run( *system );
 
-    trace( "\nFinished\n" );
-    trace( "Printing the witness to stdout...\n\n" );
+    logger::log_loud( "\nFinished\n" );
+    logger::log_loud( "Printing the witness to stdout...\n\n" );
 
     std::cout << write_aiger_witness( res );
 

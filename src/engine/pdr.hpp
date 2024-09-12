@@ -185,7 +185,7 @@ class pdr : public engine
     }
 
     void initialize();
-    result check( int bound );
+    result check();
 
     std::optional< cti_handle > get_error_cti();
     std::optional< counterexample > solve_obligation( const proof_obligation& starting_po );

@@ -10,11 +10,9 @@ namespace geyser::car
 result car::run( const transition_system& system )
 {
     _system = &system;
-    const auto bound = _opts->bound.value_or( std::numeric_limits< int >::max() );
-
     initialize();
 
-    return check( bound );
+    return check();
 }
 
 void car::initialize()
@@ -51,9 +49,9 @@ void car::refresh_solver()
             _solver.assert_formula( cube.negate().activate( act.var() ) );
 }
 
-result car::check( int bound )
+result car::check()
 {
-    while ( depth() < bound )
+    while ( true )
     {
         // Let's first look at the states we already stored in the cotrace.
         if ( const auto cex = check_existing_cotrace(); cex.has_value() )
@@ -74,8 +72,6 @@ result car::check( int bound )
         log_trace_content();
         log_cotrace_content();
     }
-
-    return unknown{ std::format( "counterexample not found after {} frames", bound ) };
 }
 
 std::optional< counterexample > car::check_existing_cotrace()

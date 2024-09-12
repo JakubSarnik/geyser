@@ -16,7 +16,9 @@ namespace geyser
 result bmc::run( const transition_system& system )
 {
     _system = &system;
-    const auto bound = _opts->bound.value_or( std::numeric_limits< int >::max() );
+    const auto bound = _opts->value_or( "-k", std::numeric_limits< int >::max() );
+
+    logger::log_line_loud("Running bmc with bound = {}", bound );
 
     setup_versioning();
 

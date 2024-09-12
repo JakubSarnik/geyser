@@ -10,11 +10,9 @@ namespace geyser::pdr
 result pdr::run( const transition_system& system )
 {
     _system = &system;
-    const auto bound = _opts->bound.value_or( std::numeric_limits< int >::max() );
-
     initialize();
 
-    return check( bound );
+    return check();
 }
 
 void pdr::initialize()
@@ -32,9 +30,9 @@ void pdr::initialize()
     _init_cube = formula_as_cube( _system->init() );
 }
 
-result pdr::check( int bound )
+result pdr::check()
 {
-    while ( depth() < bound )
+    while ( true )
     {
         if ( const auto cti = get_error_cti(); cti.has_value() )
         {
@@ -51,8 +49,6 @@ result pdr::check( int bound )
 
         _ctis.flush();
     }
-
-    return unknown{ std::format( "counterexample not found after {} frames", bound ) };
 }
 
 // Returns a cti handle to a state which reaches error under given

@@ -168,7 +168,7 @@ class car : public engine
     }
 
     void initialize();
-    result check( int bound );
+    result check();
     std::optional< counterexample > check_existing_cotrace();
     std::optional< counterexample > check_new_error_states();
 

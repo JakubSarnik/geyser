@@ -19,7 +19,7 @@ namespace
 
 std::unique_ptr< engine > get_engine( const options& opts, variable_store& store )
 {
-    const auto& name = opts.engine_name;
+    const auto& name = opts.engine_name();
 
     if ( name == "bmc" )
         return std::make_unique< bmc >( opts, store );
@@ -33,31 +33,35 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
     return nullptr;
 }
 
+void print_help()
+{
+    // TODO: Implement --help
+}
+
 } // namespace <anonymous>
 
 int main( int argc, char** argv )
 {
     auto opts = parse_cli( argc, argv );
 
-    // TODO: Implement --help!
     if ( !opts.has_value() )
     {
-        std::cerr << "error: " << opts.error() << "\n";
+        std::cerr << "error: " << opts.error() << "\n\n";
+        print_help();
         return 1;
     }
 
-    logger::set_verbosity( opts->verbosity );
+    if ( opts->help_requested() )
+    {
+        print_help();
+        return 0;
+    }
 
-    auto aig = make_aiger();
-
-    const char* msg = nullptr;
-
+    logger::set_verbosity( opts->verbosity() );
     logger::log_loud( "Loading aig from file... " );
 
-    if ( opts->input_file.has_value() )
-        msg = aiger_open_and_read_from_file( aig.get(), opts->input_file->c_str() );
-    else
-        msg = aiger_read_from_file( aig.get(), stdin );
+    auto aig = make_aiger();
+    const char* msg = aiger_open_and_read_from_file( aig.get(), opts->input_file().c_str() );
 
     if ( msg != nullptr )
     {
@@ -73,7 +77,7 @@ int main( int argc, char** argv )
 
     if ( !engine )
     {
-        std::cerr << "error: no engine named " << opts->engine_name << "\n";
+        std::cerr << "error: no engine named " << opts->engine_name() << "\n";
         return 1;
     }
 

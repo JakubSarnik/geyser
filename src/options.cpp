@@ -1,15 +1,50 @@
 #include "options.hpp"
+#include <cassert>
+#include <set>
+#include <format>
 
 namespace
 {
 
-enum class state
+bool requests_help( int argc, char const* const* argv )
 {
-    expecting_engine,
-    expecting_bound,
-    anything,
-    finished
-};
+    for ( int i = 1; i < argc; ++i )
+        if ( std::set< std::string >{ "-h", "--help" }.contains( argv[ i ] ) )
+            return true;
+
+    return false;
+}
+
+bool is_reserved_opt( const std::string& opt )
+{
+    const auto reserved = std::set< std::string >{
+        "-h", "--help",
+        "-e", "--engine",
+        "-v", "--verbose", "--debug"
+    };
+
+    return reserved.contains( opt );
+}
+
+std::optional< int > try_parse( const std::string& expected_int )
+{
+    size_t chars;
+    int val;
+
+    try
+    {
+        val = std::stoi( expected_int, &chars );
+    }
+    catch ( ... )
+    {
+        return {};
+    }
+
+    if ( chars != expected_int.length() )
+        return {};
+
+    return val;
+}
 
 } // namespace <anonymous>
 
@@ -18,84 +53,82 @@ namespace geyser
 
 std::expected< options, std::string > parse_cli( int argc, char const* const* argv )
 {
-    auto state = state::anything;
+    if ( requests_help( argc, argv ) )
+        return options::help();
 
-    auto bound = std::optional< int >{};
-    auto engine_name = std::optional< std::string >{};
     auto input_file = std::optional< std::string >{};
-    auto verbosity = verbosity_level::silent;
+    auto opts = std::map< std::string, std::optional< std::string > >{};
 
     for ( int i = 1; i < argc; ++i )
     {
         const auto arg = std::string{ argv[ i ] };
 
-        switch ( state )
+        if ( arg.starts_with( "-" ) )
         {
-            case state::expecting_engine:
-            {
-                engine_name = arg;
-                state = state::anything;
-            } break;
+            const auto pos = arg.find( '=' );
 
-            case state::expecting_bound:
-            {
-                size_t chars;
-                int val;
+            if ( pos == std::string::npos )
+                opts.emplace( arg, std::nullopt );
+            else
+                opts.emplace( arg.substr( 0, pos ), arg.substr( pos + 1 ) );
+        }
+        else
+        {
+            if ( input_file.has_value() )
+                return std::unexpected{ std::format( "unexpected input file {} when {} already given", arg, *input_file ) };
 
-                try
-                {
-                    val = std::stoi( arg, &chars );
-                }
-                catch (...)
-                {
-                    return std::unexpected{ "the bound must be a valid positive number" };
-                }
-
-                if ( chars != arg.length() || val < 0 )
-                    return std::unexpected{ "the bound must be a valid positive number" };
-
-                bound = val;
-                state = state::anything;
-            } break;
-
-            case state::anything:
-            {
-                if ( arg == "-v" || arg == "--verbose" )
-                    verbosity = verbosity_level::loud;
-                else if ( arg == "--debug" )
-                    verbosity = verbosity_level::debug;
-                else if ( arg == "-k" || arg == "-b" || arg == "--bound" )
-                    state = state::expecting_bound;
-                else if ( arg == "-e" || arg == "--engine" )
-                    state = state::expecting_engine;
-                else
-                {
-                    input_file = arg;
-                    state = state::finished;
-                }
-            } break;
-
-            case state::finished:
-                return std::unexpected{ "no arguments are expected after the input file name" };
+            input_file = arg;
         }
     }
 
-    if ( state == state::expecting_engine )
-        return std::unexpected{ "expected an engine name" };
-    if ( state == state::expecting_bound )
-        return std::unexpected{ "expected a bound value" };
-    if ( !engine_name.has_value() )
+    if ( !input_file.has_value() )
+        return std::unexpected{ "expected a path to the input file" };
+
+    if ( !opts.contains( "-e" ) && !opts.contains( "--engine" ) )
         return std::unexpected{ "no engine name given" };
+    if ( opts.contains( "-e" ) && !opts.at( "-e" ).has_value() )
+        return std::unexpected{ "expected an engine name after -e" };
+    if ( opts.contains( "--engine" ) && !opts.at( "--engine" ).has_value() )
+        return std::unexpected{ "expected an engine name after --engine" };
 
-    auto opts = options
+    const auto engine_name = opts.contains( "-e" ) ? opts.at( "-e" ) : opts.at( "--engine" );
+
+    const auto verbosity = [ & ]
     {
-        .input_file = input_file,
-        .engine_name = *engine_name,
-        .verbosity = verbosity,
-        .bound = bound
-    };
+        if ( opts.contains( "-v" ) || opts.contains( "--verbose" ) )
+            return verbosity_level::loud;
+        if ( opts.contains( "--debug" ) )
+            return verbosity_level::debug;
 
-    return opts;
+        return verbosity_level::silent;
+    }();
+
+    auto other = std::map< std::string, std::optional< int > >{};
+
+    for ( const auto& [ key, value ] : opts )
+    {
+        if ( is_reserved_opt( key ) )
+            continue;
+
+        if ( value.has_value() )
+        {
+            auto num = try_parse( *value );
+
+            if ( !num.has_value() )
+                return std::unexpected{ std::format( "the switch {} requires an integer parameter", key ) };
+
+            other.emplace( key, num );
+        }
+        else
+        {
+            other.emplace( key, std::nullopt );
+        }
+    }
+
+    assert( input_file.has_value() );
+    assert( engine_name.has_value() );
+
+    return options{ *input_file, *engine_name, verbosity, std::move( other ) };
 }
 
 } // namespace geyser

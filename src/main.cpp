@@ -35,7 +35,9 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
 
 void print_help()
 {
-    // TODO: Implement --help
+    std::cout << "Geyser symbolic model checker\n";
+    std::cout << "Usage: run-geyser -e=<engine> [-v | --verbose] [arguments] <input.aig>\n";
+    std::cout << "For engine names and possible arguments, consult the readme.\n";
 }
 
 } // namespace <anonymous>

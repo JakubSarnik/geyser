@@ -6,11 +6,6 @@ mainly property directed reachability (PDR), complementary approximate
 reachability (CAR), and variants of thereof. The code is part of my master's
 thesis at the Faculty of Informatics, Masaryk University.
 
-At the moment, the following algorithms are implemented:
-- Bounded model checking (`engine/bmc`)
-- Property directed reachability (`engine/pdr`)
-- Complementary approximate reachability (`engine/car`)
-
 The model checker works with input models given in the format Aiger 1.9
 (https://fmv.jku.at/aiger/) with several restrictions. Justice properties and
 fairness constraints are not and will not be supported. Invariance constraints
@@ -32,13 +27,22 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 
-After building, run with `./run-geyser [-v] -e <engine name> <input>`, where
-`<engine name>` is one of the supported engines (e.g. `pdr`, `car` or `bmc`)
-and `<input>` is a path to a transition system in the Aiger format. Geyser
-then checks that the system is correct and outputs the result to the standard
-output. The option `-v` enables verbose printing of progress and other
-information. For full description of all the options, run
-`./run-geyser --help`.
+After building, run with
+`./run-geyser -e=<engine> [-v | --verbose] [arguments] <input.aig>`, where
+`<engine>` is one of the supported engines (see below) and `<input>` is a path
+to a transition system in the Aiger format. Geyser then checks that the system
+is correct and outputs the result to the standard output. The option `-v`
+enables verbose printing of progress and other information.
+
+## Model checking engines
+
+Currently, the following algorithms are implemented:
+- Property directed reachability (`pdr`) 
+- Complementary approximate reachability (`car`)
+- Simple bounded model checking (`bmc`)
+  - To limit the maximal length of the trace, pass an argument of the form
+    `-k=<num>`.
+- Naive backward CAR (`bcar`)
 
 ## Third-party code
 

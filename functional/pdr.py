@@ -8,7 +8,7 @@ AIGSIM_PATH = path.expanduser("~/workbench/aiger/aigsim")
 HWMCC2010 = path.expanduser("~/workbench/geyser/benchmarks/hwmcc/2010")
 TIMEOUT_SECS = 60
 
-GEYSER_CMD = f"{GEYSER_PATH} -e pdr $aiger"
+GEYSER_CMD = f"{GEYSER_PATH} -e=pdr $aiger"
 
 TOOLS = [
     runner.Tool("geyser", Template(GEYSER_CMD), validate=True)

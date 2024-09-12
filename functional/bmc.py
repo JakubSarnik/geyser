@@ -12,7 +12,7 @@ BOUND = 20
 TIMEOUT_SECS = 60
 
 # TODO: Remove -m from aiger command once running AIGER 1.9
-GEYSER_CMD = f"{GEYSER_PATH} -e bmc -k {BOUND} $aiger"
+GEYSER_CMD = f"{GEYSER_PATH} -e=bmc -k={BOUND} $aiger"
 AIGBMC_CMD = f"{AIGBMC_PATH} $aiger -m {BOUND}"
 
 TOOLS = [

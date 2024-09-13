@@ -95,9 +95,31 @@ public:
     [[nodiscard]] bad_cube_handle handle() const { return _handle; }
 };
 
+class car_options
+{
+    // Propagate unsat cores of F_i /\ T /\ c' into F_{i + 1} instead of c,
+    // just as in the paper.
+    // Default: true
+    bool _propagate_cores;
+
+    // Try to block successfully blocked proof obligations at higher
+    // levels, similarly to PDR.
+    // Default: false
+    bool _repush_blocked_obligations;
+
+public:
+    explicit car_options( const options& opts )
+            : _propagate_cores{ !opts.has( "--no-propagate-cores" ) },
+              _repush_blocked_obligations{ opts.has( "--repush" ) }
+    {}
+
+    [[nodiscard]] bool propagate_cores() const { return _propagate_cores; }
+    [[nodiscard]] bool repush_blocked_obligations() const { return _repush_blocked_obligations; }
+};
+
 class car : public engine
 {
-    const options* _opts;
+    car_options _opts;
     variable_store* _store;
 
     solver _solver;
@@ -199,7 +221,7 @@ class car : public engine
 
 public:
     car( const options& opts, variable_store& store, bool forward )
-        : _opts{ &opts }, _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
+        : _opts{ opts }, _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
           _error_activator{ _store->make( "ActE" ) }, _forward{ forward } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;

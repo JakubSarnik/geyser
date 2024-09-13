@@ -115,8 +115,6 @@ std::optional< bad_cube_handle > car::get_error_state()
          .assume( _error_activator )
          .is_sat() )
     {
-        // TODO: Extend the state as in predecessor generalization here?
-
         const auto handle = _cotrace.make( cube{ _solver.get_model( _system->state_vars() ) },
                                            cube{ _solver.get_model( _system->input_vars() ) });
 
@@ -166,9 +164,11 @@ std::optional< counterexample > car::solve_obligation( const proof_obligation& s
             logger::log_line_debug( "F[{}]: {}", po.level(), cube_to_string( c ) );
             add_blocked_at( c, po.level() );
 
-            // TODO: Is this good in CAR?
-            // if ( po.level() < depth() )
-            //     min_queue.emplace( po.handle(), po.level() + 1, po.colevel() );
+            if ( _opts.repush_blocked_obligations() )
+            {
+                if ( po.level() < depth() )
+                    min_queue.emplace( po.handle(), po.level() + 1, po.colevel() );
+            }
         }
     }
 
@@ -398,12 +398,28 @@ bool car::propagate()
 
         for ( const auto &c : _trace_blocked_cubes[ i ] )
         {
-            // TODO: Get the unsat core in the false branch, as in the paper?
-
             if ( has_predecessor( c.literals(), i + 1 ) )
+            {
                 pushed_all = false;
+            }
             else
-                add_blocked_at( c, i + 1 );
+            {
+                if ( _opts.propagate_cores() )
+                {
+                    // has_predecessor queries with c primed
+                    auto core = _solver.get_core( _system->next_state_vars() );
+
+                    for ( auto& lit : core )
+                        lit = _system->unprime( lit );
+
+                    add_blocked_at( cube{ core }, i + 1 );
+                }
+                else
+                {
+                    add_blocked_at( c, i + 1 );
+                }
+            }
+
         }
 
         if ( pushed_all )

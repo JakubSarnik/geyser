@@ -35,9 +35,24 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
 
 void print_help()
 {
-    std::cout << "Geyser symbolic model checker\n";
-    std::cout << "Usage: run-geyser -e=<engine> [-v | --verbose] [arguments] <input.aig>\n";
-    std::cout << "For engine names and possible arguments, consult the readme.\n";
+    std::cout << "Geyser symbolic model checker\n"
+                 "Usage: run-geyser -e=<engine> [-v | --verbose] [arguments] <input.aig>\n\n";
+
+    std::cout << "The following engines are available:\n"
+                 "  * bmc  - simple bounded model checking\n"
+                 "  * pdr  - property directed reachability\n"
+                 "  * car  - complementary approximate reachability\n"
+                 "  * bcar - backward variant of CAR\n\n";
+
+    std::cout << "Further arguments may be passed to the various engines:\n"
+                 "  * bmc\n"
+                 "    * -k=<bound> to limit bmc depth\n"
+                 "  * pdr - no options at the moment\n"
+                 "  * car\n"
+                 "    * --no-propagate-cores - make propagation work as in PDR instead of\n"
+                 "      propagating unsat cores\n"
+                 "    * --repush - after blocking a proof obligation, try to return to it\n"
+                 "      again in the next frame (as in PDR)\n";
 }
 
 } // namespace <anonymous>

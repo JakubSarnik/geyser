@@ -333,9 +333,9 @@ generalize_inductive( c : cube, i : int ) -> cube * int:
 
   j = k
 
-  for j' in ( i - 1 ) .. k:
-    if solver.core().contains( j' ):
-      j = j'
+  for jj in ( i - 1 ) .. k:
+    if solver.core().contains( jj ):
+      j = jj
       break
 
   # Now we may start the proper dropping of literals. First, note that we can

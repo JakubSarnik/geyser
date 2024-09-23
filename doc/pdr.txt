@@ -352,7 +352,7 @@ generalize_inductive( c : cube, i : int ) -> cube * int:
   d = c
 
   for lit in literals( c ):
-    if solver.core().contains( lit ):
+    if not solver.core().contains( lit' ):
       d.remove_literal( lit )
 
       if solver.assume( Act[ 0 ], literals( d ) ).is_sat():

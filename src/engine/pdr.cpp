@@ -151,7 +151,7 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
     for ( const auto lit : all_lits )
     {
-        if ( !_solver.is_in_core( lit ) )
+        if ( _solver.is_in_core( _system->prime( lit ) ) )
             continue;
 
         res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );

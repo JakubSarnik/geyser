@@ -328,8 +328,6 @@ std::vector< literal > car::get_minimal_core( std::span< const literal > seed,
     auto core = std::vector< literal >( seed.begin(), seed.end() );
     const auto lits = core;
 
-    // TODO: Make this more efficient?
-
     for ( const auto lit : lits )
     {
         core.erase( std::remove( core.begin(), core.end(), lit ), core.end() );

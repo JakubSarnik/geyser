@@ -286,8 +286,10 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
 
         auto core = _solver.get_core( p );
 
-        return _cotrace.make( cube{ get_minimal_core( std::move( core ), query ) },
-                              cube{ std::move( ins ) }, po.handle() );
+        if ( _opts.get_muc_predecessor() )
+            core = get_minimal_core( core, query );
+
+        return _cotrace.make( cube{ std::move( core ) }, cube{ std::move( ins ) }, po.handle() );
     }
     else
     {
@@ -311,12 +313,13 @@ cube car::generalize_blocked( const proof_obligation& po )
                 .is_sat();
     };
 
-    auto minimal = get_minimal_core( core, thunk );
+    if ( _opts.get_muc_blocked() )
+        core = get_minimal_core( core, thunk );
 
-    for ( auto& lit : minimal )
+    for ( auto& lit : core )
         lit = _system->unprime( lit );
 
-    return cube{ minimal };
+    return cube{ std::move( core ) };
 }
 
 std::vector< literal > car::get_minimal_core( std::span< const literal > seed,

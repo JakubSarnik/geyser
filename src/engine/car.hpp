@@ -107,14 +107,28 @@ class car_options
     // Default: false
     bool _repush_blocked_obligations;
 
+    // Compute a minimal unsat core from a blocked obligation core provided
+    // by the solver.
+    // Default: true
+    bool _muc_blocked;
+
+    // Compute a minimal unsat core in a predecessor generalization instead
+    // of just a normal solver-provided core.
+    // Default: true
+    bool _muc_predecessor;
+
 public:
     explicit car_options( const options& opts )
             : _propagate_cores{ !opts.has( "--no-propagate-cores" ) },
-              _repush_blocked_obligations{ opts.has( "--repush" ) }
+              _repush_blocked_obligations{ opts.has( "--repush" ) },
+              _muc_blocked{ !opts.has( "--no-blocked-muc" ) },
+              _muc_predecessor{ !opts.has( "--no-predecessor-muc" ) }
     {}
 
     [[nodiscard]] bool propagate_cores() const { return _propagate_cores; }
     [[nodiscard]] bool repush_blocked_obligations() const { return _repush_blocked_obligations; }
+    [[nodiscard]] bool get_muc_blocked() const { return _muc_blocked; }
+    [[nodiscard]] bool get_muc_predecessor() const { return _muc_predecessor; }
 };
 
 class car : public engine

@@ -13,8 +13,6 @@
 namespace geyser::pdr
 {
 
-// TODO: Consider adding a literal ordering heuristic (see e.g. IC3Ref).
-
 // CTI (counterexample to induction) is either a (possibly generalized)
 // model of the query SAT( R[ k ] /\ E ), i.e. it is a model of both state
 // variables X and input variables Y so that input Y in state X leads to

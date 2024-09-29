@@ -1,0 +1,79 @@
+One of the differences between PDR and CAR is how they handle error states.
+While in PDR, we only need to check whether R[ k ] /\ E is satisfiable, in CAR,
+we actually want to check R[ k ] /\ (B_0 \/ B_1 \/ ... \/ B_n), where n is the
+length of the cotrace. Further, B_0 = E, but B_1 up to B_n are sets of cubes
+(or DNF formulas), and the whole disjunction is very far from a CNF formula
+required by the solver.
+
+In our implementation (which is inspired by SimpleCAR in this regard), this
+is done by computing each B_0, ..., B_n lazily. At the start of each new
+frame, we first try looking at R[ k ] /\ B_i for each i, and then we try to
+extend B_0 by querying R[ k ] /\ E and storing the results in B_0. This is not
+very pretty, and it also begs the question as to in which order to scan the
+cotrace, which we solve by always going from n to 0, which is the default in
+SimpleCAR (we don't provide a configuration option here, as it would just make
+the code more ugly and expose what's basically an implementation detail).
+
+There is, however, a way of making this extraction of bad states work almost
+the same way as in PDR, using the CaDiCaL constrain API and on-the-fly Tseitin
+encoding. The basic idea is as follows: Instead of storing the cotrace clauses,
+we actually store a vector of activation literals Bad, with Bad[ 0 ] being the
+error activator. Whenever we check R[ k ] /\ (B_0 \/ B_1 \/ ... \/ B_n), what
+we actually query is R[ k ] /\ (Bad[ 0 ] \/ ... \/ Bad[ |Bad| - 1 ]), which is
+implementable by a query solver.assume( R[ k ] ).constrain( Bad[ 0 ], ... ).
+
+Then, each time we actually find a new cube c that surely reaches some error
+state, instead of just adding it to B[ j ] (for some computed j) as in CAR, we
+actually create a new activator b in Bad and push b <-> c into the solver.
+
+That is, the main loop of the algorithm becomes (c.f. the PDR one in pdr() and
+the CAR one in car())
+
+  loop:
+      while solver.assume( Act[ k ] )
+                  .constrain( Bad[ 0 ], ..., Bad[ |Bad| - 1 ] )
+                  .is_sat():
+
+        s = solver.get_model().filter( is_state_variable )
+
+        if solve_obligation( < s, k > ) == counterexample:
+
+          return counterexample
+
+      push_frame() # Create (empty) F_{k + 1}.
+
+      if propagate() == invariant_found:
+        return ok
+
+While the function add_reaching_at, called this time only in solve_obligation
+(as we don't actually add any states to B_0) becomes just add_reaching:
+
+add_reaching( c : cube ):
+  b = make_variable()
+  Bad.push_back( b )
+
+  # Add b <-> c in the solver. Since c is a cube, we have
+  # c = l_1 /\ l_2 /\ ... /\ l_n, so the equivalence splits into
+  #   1. l_1 /\ l_2 /\ ... /\ l_n -> b, which is a clause
+  #      -l_1 \/ ... \/ -l_n \/ b
+  #   2. b -> l_1 /\ l_2 /\ ... /\ l_n, which further splits into two-element
+  #      clauses -b \/ l_1 ... -b \/ l_n.
+
+  # TODO: Maybe we actually only care for the second implication?
+
+  solver.add_clause( { -l_1, ..., -l_n, b } )
+
+  for l in literals( c ):
+    solver.add_clause( { -b, l } )
+
+Note that this effectively makes the cotrace just a set of states that surely
+reach an error state in some unknown number of steps. It therefore also removes
+the need to think about the order of cotrace scan, etc. On the other hand, it
+makes it a bit harder to actually know which state we are working with in the
+proof obligation (i.e. where to look in the cube pool). For this, we need to
+somehow translate the cube s in the main loop to the state pool entry (e.g. by
+using a hashmap, perhaps storing also the distance to the error for heuristic
+purposes). Alternatively, we can look at the model given by the solver to
+determine which Bad[ i ] gave us the error and store the pool entry for each
+Bad activator (with Bad[ 0 ] being special and the pool entries being
+constructed in the main loop).

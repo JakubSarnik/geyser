@@ -30,20 +30,22 @@ That is, the main loop of the algorithm becomes (c.f. the PDR one in pdr() and
 the CAR one in car())
 
   loop:
-      while solver.assume( Act[ k ] )
-                  .constrain( Bad[ 0 ], ..., Bad[ |Bad| - 1 ] )
-                  .is_sat():
+    while solver.assume( Act[ k ] )
+                .constrain( Bad[ 0 ], ..., Bad[ |Bad| - 1 ] )
+                .is_sat():
 
-        s = solver.get_model().filter( is_state_variable )
+      s = solver.get_model().filter( is_state_variable )
 
-        if solve_obligation( < s, k > ) == counterexample:
+      if solve_obligation( < s, k > ) == counterexample:
+        return counterexample
 
-          return counterexample
+    push_frame() # Create (empty) F_{k + 1}.
 
-      push_frame() # Create (empty) F_{k + 1}.
+    if propagate() == invariant_found:
+      return ok
 
-      if propagate() == invariant_found:
-        return ok
+    if is_inductive()
+      return ok
 
 While the function add_reaching_at, called this time only in solve_obligation
 (as we don't actually add any states to B_0) becomes just add_reaching:

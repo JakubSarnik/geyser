@@ -68,7 +68,7 @@ void icar::add_blocked_to_solver( bad_cube_handle h, literal act )
     _solver.assert_formula( cnf );
 }
 
-result car::check()
+result icar::check()
 {
     while ( true )
     {

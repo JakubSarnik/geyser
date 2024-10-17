@@ -9,7 +9,7 @@ HWMCC2010 = path.expanduser("~/workbench/geyser/benchmarks/hwmcc/2010")
 TIMEOUT_SECS = 60
 
 GEYSER_PDR_CMD = f"{GEYSER_PATH} -e=pdr $aiger"
-GEYSER_CAR_CMD = f"{GEYSER_PATH} -e=car $aiger"
+GEYSER_CAR_CMD = f"{GEYSER_PATH} -e=car --repush --no-predecessor-muc $aiger"
 
 TOOLS = [
     runner.Tool("geyser-pdr", Template(GEYSER_PDR_CMD), validate=True),

@@ -8,6 +8,7 @@
 #include "engine/bmc.hpp"
 #include "engine/pdr.hpp"
 #include "engine/car.hpp"
+#include "engine/icar.hpp"
 #include <string>
 #include <iostream>
 #include <map>
@@ -29,12 +30,16 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
         return std::make_unique< car::forward_car >( opts, store );
     if ( name == "bcar" )
         return std::make_unique< car::backward_car >( opts, store );
+    if ( name == "icar" )
+        return std::make_unique< icar::icar >( opts, store );
 
     return nullptr;
 }
 
 void print_help()
 {
+    // TODO: Describe all engines and options
+
     std::cout << "Geyser symbolic model checker\n"
                  "Usage: run-geyser -e=<engine> [-v | --verbose] [arguments] <input.aig>\n\n";
 

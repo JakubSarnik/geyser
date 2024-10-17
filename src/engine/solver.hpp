@@ -83,6 +83,18 @@ public:
             return *this;
         }
 
+        query_builder& constrain_clause( std::span< const literal > clause )
+        {
+            assert( _s );
+            assert( _s->_solver );
+
+            for ( const auto l : clause )
+                _s->_solver->constrain( l.value() );
+            _s->_solver->constrain( 0 );
+
+            return *this;
+        }
+
         [[nodiscard]]
         bool is_sat()
         {

@@ -7,6 +7,7 @@ add_executable(test
         options.cpp
         pdr.cpp
         car.cpp
+        icar.cpp
 )
 
 target_link_libraries(test PRIVATE Catch2::Catch2WithMain)

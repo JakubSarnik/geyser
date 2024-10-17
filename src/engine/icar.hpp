@@ -82,8 +82,23 @@ public:
     [[nodiscard]] bad_cube_handle handle() const { return _handle; }
 };
 
+class icar_options
+{
+    // Enable generalization of error states by use of the cotrace.
+    // Default: true
+    bool _enable_cotrace;
+
+public:
+    explicit icar_options( const options& opts )
+            : _enable_cotrace{ !opts.has( "--no-cotrace" ) }
+    {}
+
+    [[nodiscard]] bool enable_cotrace() const { return _enable_cotrace; }
+};
+
 class icar : public engine
 {
+    icar_options _opts;
     variable_store* _store;
 
     solver _solver;
@@ -169,7 +184,7 @@ class icar : public engine
 
 public:
     icar( const options& opts, variable_store& store )
-            : _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
+            : _opts{ opts }, _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
               _error_activator{ _store->make( "ActE" ) } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;

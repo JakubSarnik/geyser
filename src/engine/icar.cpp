@@ -296,6 +296,9 @@ std::vector< literal > icar::get_minimal_core( std::span< const literal > seed,
 
 void icar::add_reaching( bad_cube_handle h )
 {
+    if ( !_opts.enable_cotrace() )
+        return;
+
     const auto& res = _cotrace_found_cubes.emplace_back( h, literal{ _store->make() } );
     add_blocked_to_solver( res.first, res.second );
 }

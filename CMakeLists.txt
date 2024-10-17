@@ -38,6 +38,7 @@ add_library(geyser STATIC
         src/engine/bmc.cpp
         src/engine/pdr.cpp
         src/engine/car.cpp
+        src/engine/icar.cpp
 )
 
 target_link_libraries(geyser PUBLIC aiger)

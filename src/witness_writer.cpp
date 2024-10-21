@@ -7,8 +7,6 @@ namespace geyser
 namespace
 {
 
-// TODO: If we want to allow more bad property specifications in the input,
-//       make this dynamic.
 constexpr const char* property = "b0";
 
 std::string row( const valuation& val )

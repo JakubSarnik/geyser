@@ -167,7 +167,7 @@ class pdr : public engine
         assert( _trace_blocked_cubes.size() == _trace_activators.size() );
 
         _trace_blocked_cubes.emplace_back();
-        _trace_activators.emplace_back( _store->make( std::format( "Act[{}]", depth() + 1 ) ) );
+        _trace_activators.emplace_back( _store->make() );
     }
 
     std::span< cube_set > frames_from( int level )
@@ -204,8 +204,8 @@ class pdr : public engine
 
 public:
     pdr( const options& opts, variable_store& store )
-        : _opts{ &opts }, _store{ &store }, _transition_activator{ _store->make( "ActT" ) },
-          _error_activator{ _store->make( "ActE" ) } {}
+        : _opts{ &opts }, _store{ &store }, _transition_activator{ _store->make() },
+          _error_activator{ _store->make() } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;
 };

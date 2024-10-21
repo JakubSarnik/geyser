@@ -12,15 +12,6 @@ namespace geyser::builder
 namespace
 {
 
-std::string symbol_to_string( const std::string& prefix, unsigned i, aiger_symbol& symbol )
-{
-    // Anonymous inputs/state vars get names like y[10]/x[2], respectively.
-    if ( symbol.name == nullptr )
-        return std::format( "{}[{}]", prefix, i );
-    else // NOLINT else after return is fine here
-        return std::string{ symbol.name };
-}
-
 // Turn an Aiger declaration
 //   lhs = rhs0 /\ rhs1
 // into a set of clauses using a Tseitin transformation. This must take care
@@ -226,26 +217,10 @@ std::expected< context, std::string > make_context( variable_store& store, aiger
     return context
     {
         .aig = &aig,
-
-        .input_vars = store.make_range( int( aig.num_inputs ), [ & ]( int i )
-        {
-            return symbol_to_string( "y", i, aig.inputs[ i ] );
-        }),
-
-        .state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-        {
-            return symbol_to_string( "x", i, aig.latches[ i ] );
-        }),
-
-        .next_state_vars = store.make_range( int( aig.num_latches ), [ & ]( int i )
-        {
-            return symbol_to_string( "x'", i, aig.latches[ i ] );
-        }),
-
-        .and_vars = store.make_range( int( aig.num_ands ), []( int i )
-        {
-            return std::format("and[{}]", i);
-        } )
+        .input_vars = store.make_range( int( aig.num_inputs ) ),
+        .state_vars = store.make_range( int( aig.num_latches ) ),
+        .next_state_vars = store.make_range( int( aig.num_latches ) ),
+        .and_vars = store.make_range( int( aig.num_ands ) )
     };
 }
 

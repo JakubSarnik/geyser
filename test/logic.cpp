@@ -1,7 +1,6 @@
 #include "common.hpp"
 #include "logic.hpp"
 #include <vector>
-#include <format>
 
 using namespace geyser;
 
@@ -24,18 +23,6 @@ TEST_CASE( "Variable store hands out different variables" )
     auto y = store.make();
 
     REQUIRE( x != y );
-}
-
-TEST_CASE( "Variables have the expected names" )
-{
-    auto store = variable_store{};
-
-    auto x = store.make( "foo" );
-    auto y = store.make( "bar" );
-
-    REQUIRE( store.get_name( x ) == "foo" );
-    REQUIRE( store.get_name( y ) == "bar" );
-    REQUIRE( store.get_name( variable{ 1 } ) == "foo" );
 }
 
 TEST_CASE( "Variable ranges have the expected sizes" )
@@ -127,46 +114,6 @@ TEST_CASE( "Variable store hands out ranges correctly" )
     REQUIRE( r2.contains( variable{ 6 } ) );
     REQUIRE( r2.contains( variable{ 7 } ) );
     REQUIRE( r2.contains( variable{ 8 } ) );
-}
-
-TEST_CASE( "Ranges are named correctly" )
-{
-    auto store = variable_store{};
-
-    SECTION( "when no name is present" )
-    {
-        const auto range = store.make_range( 4 );
-
-        for ( const auto var : range )
-            REQUIRE( store.get_name( var ) == "" );
-    }
-
-    SECTION( "when a constant name is present" )
-    {
-        const auto namer = []( int )
-        {
-            return "name";
-        };
-
-        const auto range = store.make_range( 4, namer );
-
-        for ( const auto var : range )
-            REQUIRE( store.get_name( var ) == "name" );
-    }
-
-    SECTION( "when a dynamic name is present" )
-    {
-        const auto namer = []( int i )
-        {
-            return std::format("x{}", i);
-        };
-
-        const auto range = store.make_range( 3, namer );
-
-        REQUIRE( store.get_name( range.nth( 0 ) ) == "x0" );
-        REQUIRE( store.get_name( range.nth( 1 ) ) == "x1" );
-        REQUIRE( store.get_name( range.nth( 2 ) ) == "x2" );
-    }
 }
 
 TEST_CASE( "Literals have the expected IDs and values" )

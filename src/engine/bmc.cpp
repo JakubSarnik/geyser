@@ -136,12 +136,7 @@ const cnf_formula& bmc::make_trans( int step )
     const auto make_vars = [ & ]( variable_range unversioned, vars& versioned )
     {
         while ( versioned.size() <= step + 1 )
-        {
-            versioned.push_back( _store->make_range( unversioned.size(), [ & ]( int i )
-            {
-                return std::format( "{}/{}", _store->get_name( unversioned.nth( i ) ), step );
-            } ) );
-        }
+            versioned.push_back( _store->make_range( unversioned.size() ) );
     };
 
     make_vars( _system->state_vars(), _versioned_state_vars );
@@ -190,7 +185,7 @@ cnf_formula bmc::make_error( int step )
     const auto ins = _versioned_input_vars[ step ];
     const auto here = _versioned_state_vars[ step ];
     const auto aux = _versioned_aux_vars[ step ];
-    const auto activator = _store->make( std::format( "activator[{}]", step ) );
+    const auto activator = _store->make();
 
     assert( step == _activators.size() );
     _activators.emplace_back( activator );

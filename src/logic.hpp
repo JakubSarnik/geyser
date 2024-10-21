@@ -143,59 +143,27 @@ using valuation = std::vector< literal >;
 
 class variable_store
 {
-    // TODO: Do we even need the names? Probably not, so remove.
-    // Maps a variable identifier (a positive integer) to its name.
-    std::vector< std::string > _names;
-
-    [[nodiscard]] int get_next_id() const
-    {
-        return static_cast< int >( _names.size() );
-    }
+    int _next_id = 1;
 
 public:
-    // A dummy value for 0
-    variable_store() : _names{ "" } {}
+    variable_store() = default;
 
-    variable make( std::string name = "" )
+    variable make()
     {
-        _names.emplace_back( std::move( name ) );
-        return variable{ static_cast< int >( _names.size() - 1 ) };
-    }
-
-    // Namer is a callback that receives the current index (0 based, not id) of
-    // the variable and returns its name. Returns a left-inclusive, right-exclusive
-    // pair of delimiting IDs.
-    [[nodiscard]]
-    variable_range make_range( int n, const std::regular_invocable< int > auto& namer )
-    {
-        const auto fst = get_next_id();
-
-        for ( auto i = 0; i < n; ++i )
-            make( namer( i ) );
-
-        const auto snd = get_next_id();
-
-        return { fst, snd };
+        return variable{ _next_id++ };
     }
 
     [[nodiscard]]
     variable_range make_range( int n )
     {
-        const auto namer = []( int )
-        {
-            return "";
-        };
+        const auto fst = _next_id;
 
-        return make_range( n, namer );
-    }
+        for ( auto i = 0; i < n; ++i )
+            make();
 
-    [[nodiscard]]
-    const std::string& get_name( variable var ) const
-    {
-        assert( var.id() >= 0 );
-        assert( var.id() < _names.size() );
+        const auto snd = _next_id;
 
-        return _names[ var.id() ];
+        return { fst, snd };
     }
 };
 

@@ -214,8 +214,8 @@ std::expected< context, std::string > make_context( variable_store& store, aiger
                                 " are not supported." );
 
     if ( aig.num_constraints > 0 )
-        return std::unexpected( "NOT IMPLEMENTED: aiger 1.9 invariant constraints are not"
-                                " implemented yet" );
+        return std::unexpected( "Aiger 1.9 invariant constraints are not"
+                                " implemented. Unconstrain the system." );
 
     // clausify_subgraph depends on ordering of ANDs where each line refers
     // only to literals from previous lines. This, among other things, is

@@ -117,18 +117,24 @@ class car_options
     // Default: true
     bool _muc_predecessor;
 
+    // Enable generalization of error states by use of the cotrace.
+    // Default: true
+    bool _enable_cotrace;
+
 public:
     explicit car_options( const options& opts )
             : _propagate_cores{ !opts.has( "--no-propagate-cores" ) },
               _repush_blocked_obligations{ opts.has( "--repush" ) },
               _muc_blocked{ !opts.has( "--no-blocked-muc" ) },
-              _muc_predecessor{ !opts.has( "--no-predecessor-muc" ) }
+              _muc_predecessor{ !opts.has( "--no-predecessor-muc" ) },
+              _enable_cotrace{ !opts.has( "--no-cotrace" ) }
     {}
 
     [[nodiscard]] bool propagate_cores() const { return _propagate_cores; }
     [[nodiscard]] bool repush_blocked_obligations() const { return _repush_blocked_obligations; }
     [[nodiscard]] bool get_muc_blocked() const { return _muc_blocked; }
     [[nodiscard]] bool get_muc_predecessor() const { return _muc_predecessor; }
+    [[nodiscard]] bool enable_cotrace() const { return _enable_cotrace; }
 };
 
 class car : public engine

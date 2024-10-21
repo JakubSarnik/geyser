@@ -345,6 +345,9 @@ void car::add_reaching_at( bad_cube_handle h, int level )
 {
     assert( 0 <= level );
 
+    if ( !_opts.enable_cotrace() )
+        return;
+
     while ( codepth() < level )
         push_coframe();
 

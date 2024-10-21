@@ -71,10 +71,6 @@ std::optional< counterexample > bmc::check_for( int step )
     //    Error(X_i) /\ Error(X_{i + 1}) /\ ... /\ Error(X_{step - 1}),
     // for some i, which must be disabled.
 
-    // TODO: We actually only need to add the unit clause !_activators.back()
-    //       once we are finished with this SAT call. We don't need to collect
-    //       all the activation literals.
-
     auto q = _solver.query();
 
     for ( std::size_t i = 0; i < _activators.size() - 1; ++i )

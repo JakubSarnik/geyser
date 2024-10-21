@@ -87,8 +87,6 @@ cnf_formula clausify_and( context& ctx, aiger_and conj )
 // or negative (odd).
 cnf_formula clausify_subgraph( context& ctx, std::unordered_set< aiger_literal > required )
 {
-    // TODO: Consider changing from unordered set to vector<bool> and moving it here from
-    //       callsites. (But benchmark this!)
     auto result = cnf_formula{};
 
     for ( auto i = int( ctx.aig->num_ands ) - 1; i >= 0; --i )

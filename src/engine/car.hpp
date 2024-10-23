@@ -85,9 +85,8 @@ public:
     };
 
     // Note that this defaulted comparison orders first by level (lesser frame
-    // first) and then by colevel (closer to error first). This might be in
-    // conflict with the order in which we scan the cotrace in check.
-    // TODO: Investigate
+    // first) and then by colevel (closer to error first). This is similar to
+    // the heuristic used by Bradley in IC3Ref, but we get it for free here.
     friend auto operator<=>( const proof_obligation&, const proof_obligation& ) = default;
 
     [[nodiscard]] int level() const { return _level; }

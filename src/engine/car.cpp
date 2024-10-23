@@ -562,7 +562,6 @@ cnf_formula car::negate_cnf( const cnf_formula& f )
     // Finally add -x, saying that the whole formula is false.
     // (Yes, this is almost the same as clausify_frame_negation above, but the
     // negations are the other way around, sigh...)
-    // TODO: Somehow deduplicate.
 
     auto negation = cnf_formula{};
     const auto x = literal{ _store->make() };

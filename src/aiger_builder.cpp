@@ -16,7 +16,7 @@ namespace
 //   lhs = rhs0 /\ rhs1
 // into a set of clauses using a Tseitin transformation. This must take care
 // when either of rhs0/rhs1 is a constant 0 (false) or 1 (true).
-cnf_formula clausify_and( context& ctx, aiger_and conj )
+void clausify_and( context& ctx, const aiger_and& conj, cnf_formula& result )
 {
     const auto mk_lit = [ & ]( aiger_literal lit )
     {
@@ -28,51 +28,30 @@ cnf_formula clausify_and( context& ctx, aiger_and conj )
         // ~> (x -> y) /\ (y -> x)
         // ~> (-x \/ y) /\ (-y \/ x)
 
-        auto res = cnf_formula{};
-
-        res.add_clause( !mk_lit( x ), mk_lit( y ) );
-        res.add_clause( !mk_lit( y ), mk_lit( x ) );
-
-        return res;
+        result.add_clause( !mk_lit( x ), mk_lit( y ) );
+        result.add_clause( !mk_lit( y ), mk_lit( x ) );
     };
 
     const auto [ lhs, rhs0, rhs1 ] = conj;
 
-    // lhs = false
-    if ( rhs0 == aiger_false || rhs1 == aiger_false )
+    if ( rhs0 == aiger_false || rhs1 == aiger_false ) // lhs = false
+        result.add_clause( !mk_lit( lhs ) );
+    else if ( rhs0 == aiger_true && rhs1 == aiger_true ) // lhs = true
+        result.add_clause( mk_lit( lhs ) );
+    else if ( rhs0 == aiger_true )
+        make_equivalence( lhs, rhs1 );
+    else if ( rhs1 == aiger_true )
+        make_equivalence( lhs, rhs0 );
+    else
     {
-        auto res = cnf_formula{};
-        res.add_clause( !mk_lit( lhs ) );
+        // lhs = rhs0 /\ rhs1
+        // ~> (lhs -> rhs0) /\ (lhs -> rhs1) /\ (rhs0 /\ rhs1 -> lhs)
+        // ~> (-lhs \/ rhs0) /\ (-lhs \/ rhs1) /\ (-rhs0 \/ -rhs1 \/ lhs)
 
-        return res;
+        result.add_clause( !mk_lit( lhs ), mk_lit( rhs0 ) );
+        result.add_clause( !mk_lit( lhs ), mk_lit( rhs1 ) );
+        result.add_clause( !mk_lit( rhs0 ), !mk_lit( rhs1 ),mk_lit( lhs ) );
     }
-
-    // lhs = true
-    if ( rhs0 == aiger_true && rhs1 == aiger_true )
-    {
-        auto res = cnf_formula{};
-        res.add_clause( mk_lit( lhs ) );
-
-        return res;
-    }
-
-    if ( rhs0 == aiger_true )
-        return make_equivalence( lhs, rhs1 );
-
-    if ( rhs1 == aiger_true )
-        return make_equivalence( lhs, rhs0 );
-
-    auto res = cnf_formula{};
-
-    // lhs = rhs0 /\ rhs1
-    // ~> (lhs -> rhs0) /\ (lhs -> rhs1) /\ (rhs0 /\ rhs1 -> lhs)
-    // ~> (-lhs \/ rhs0) /\ (-lhs \/ rhs1) /\ (-rhs0 \/ -rhs1 \/ lhs)
-
-    res.add_clause( !mk_lit( lhs ), mk_lit( rhs0 ) );
-    res.add_clause( !mk_lit( lhs ), mk_lit( rhs1 ) );
-    res.add_clause( !mk_lit( rhs0 ), !mk_lit( rhs1 ),mk_lit( lhs ) );
-
-    return res;
 }
 
 // Do a reverse traversal from the Aiger literals representing the results
@@ -97,7 +76,7 @@ cnf_formula clausify_subgraph( context& ctx, std::unordered_set< aiger_literal >
         if ( !required.contains( lhs ) && !required.contains( aiger_not( lhs ) ) ) // NOLINT
             continue;
 
-        result.add_cnf( clausify_and( ctx, conj ) );
+        clausify_and( ctx, conj, result );
 
         required.insert( rhs0 );
         required.insert( rhs1 );
@@ -140,7 +119,7 @@ cnf_formula build_trans( context& ctx )
             roots.insert( next_aig_literal );
     }
 
-    auto trans = clausify_subgraph( ctx, roots );
+    auto trans = clausify_subgraph( ctx, std::move( roots ) );
 
     for ( auto i = 0u; i < ctx.aig->num_latches; ++i )
     {

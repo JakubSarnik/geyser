@@ -201,17 +201,23 @@ public:
 
     void add_clause( literal l1 )
     {
-        add_clause( std::vector{ l1 } );
+        _literals.emplace_back( l1 );
+        _literals.emplace_back( literal::separator );
     }
 
     void add_clause( literal l1, literal l2 )
     {
-        add_clause( std::vector{ l1, l2 } );
+        _literals.emplace_back( l1 );
+        _literals.emplace_back( l2 );
+        _literals.emplace_back( literal::separator );
     }
 
     void add_clause( literal l1, literal l2, literal l3 )
     {
-        add_clause( std::vector{ l1, l2, l3 } );
+        _literals.emplace_back( l1 );
+        _literals.emplace_back( l2 );
+        _literals.emplace_back( l3 );
+        _literals.emplace_back( literal::separator );
     }
 
     void add_cnf( const cnf_formula& formula )

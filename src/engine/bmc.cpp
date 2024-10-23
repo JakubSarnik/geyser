@@ -163,6 +163,8 @@ const cnf_formula& bmc::make_trans( int step )
             case var_type::auxiliary:
                 return lit.substitute( aux.nth( pos ) );
         }
+
+        std::terminate(); // Unreachable
     } ) );
 }
 

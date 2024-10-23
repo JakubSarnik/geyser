@@ -193,6 +193,7 @@ class pdr : public engine
     bool intersects_initial_states( std::span< const literal > c );
     bool is_relative_inductive( std::span< const literal > s, int i );
     cti_handle get_predecessor( const proof_obligation& po );
+    std::pair< std::vector< literal >, int > generalize_from_core( std::span< const literal > s, int level );
     std::pair< cube, int > generalize_inductive( const proof_obligation& po );
 
     void add_blocked_at( const cube& cube, int level, int start_from = 1 );

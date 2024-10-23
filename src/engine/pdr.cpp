@@ -128,14 +128,11 @@ cti_handle pdr::get_predecessor( const proof_obligation& po )
     return _ctis.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
 }
 
-// Proof obligation po was blocked, i.e. it has no predecessors at the previous
-// level. Its cube is therefore inductive relative to the previous level. Try
-// to shrink it and possibly move it further along the trace.
-std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
+std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< const literal > s, int level )
 {
     int j = depth();
 
-    for ( int i = po.level() - 1; i <= depth(); ++i )
+    for ( int i = level - 1; i <= depth(); ++i )
     {
         if ( _solver.is_in_core( _trace_activators[ i ] ) )
         {
@@ -144,9 +141,7 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
         }
     }
 
-    int res_level = j + 1;
-
-    auto all_lits = _ctis.get( po.handle() ).state_vars().literals();
+    const auto all_lits = std::vector< literal >( s.begin(), s.end() );
     auto res_lits = all_lits;
 
     for ( const auto lit : all_lits )
@@ -160,7 +155,16 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
             res_lits.push_back( lit );
     }
 
-    all_lits = res_lits;
+    return { std::move( res_lits ), j + 1 };
+}
+
+// Proof obligation po was blocked, i.e. it has no predecessors at the previous
+// level. Its cube is therefore inductive relative to the previous level. Try
+// to shrink it and possibly move it further along the trace.
+std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
+{
+    auto [ res_lits, res_level ] = generalize_from_core( _ctis.get( po.handle() ).state_vars().literals(), po.level() );
+    const auto all_lits = res_lits;
 
     for ( const auto lit : all_lits )
     {
@@ -168,19 +172,19 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
         if ( intersects_initial_states( res_lits ) || !is_relative_inductive( res_lits, res_level ) )
             res_lits.emplace_back( lit );
+        else
+            std::tie( res_lits, res_level ) = generalize_from_core( res_lits, res_level );
     }
-
-    const auto res_cube = cube{ std::move( res_lits ) };
 
     while ( res_level <= depth() )
     {
-        if ( is_relative_inductive( res_cube.literals(), res_level + 1 ) )
-            ++res_level;
+        if ( is_relative_inductive( res_lits, res_level + 1 ) )
+            std::tie( res_lits, res_level ) = generalize_from_core( res_lits, res_level + 1 );
         else
             break;
     }
 
-    return std::make_pair( res_cube, res_level );
+    return { cube{ std::move( res_lits ) }, res_level };
 }
 
 counterexample pdr::build_counterexample( cti_handle initial )
@@ -303,8 +307,13 @@ bool pdr::propagate()
         const auto cubes = _trace_blocked_cubes[ i ];
 
         for ( const auto& c : cubes )
+        {
             if ( is_relative_inductive( c.literals(), i + 1 ) )
-                add_blocked_at( c, i + 1, i );
+            {
+                const auto [ lits, level ] = generalize_from_core( c.literals(), i + 1 );
+                add_blocked_at( cube{ lits }, level, i );
+            }
+        }
 
         if ( _trace_blocked_cubes[ i ].empty() )
             return true;

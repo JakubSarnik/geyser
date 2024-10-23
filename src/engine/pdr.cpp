@@ -141,19 +141,25 @@ std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< c
         }
     }
 
-    const auto all_lits = std::vector< literal >( s.begin(), s.end() );
-    auto res_lits = all_lits;
+    auto res_lits = std::vector< literal >{};
 
-    for ( const auto lit : all_lits )
-    {
+    for ( const auto lit : s )
         if ( _solver.is_in_core( _system->prime( lit ) ) )
-            continue;
+            res_lits.emplace_back( lit );
 
-        res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
-
-        if ( intersects_initial_states( res_lits ) )
-            res_lits.push_back( lit );
+    if ( intersects_initial_states( res_lits ) )
+    {
+        for ( const auto lit : s )
+        {
+            if ( _init_cube.contains( !lit ) )
+            {
+                res_lits.emplace_back( lit );
+                break;
+            }
+        }
     }
+
+    assert( !intersects_initial_states( res_lits ) );
 
     return { std::move( res_lits ), j + 1 };
 }

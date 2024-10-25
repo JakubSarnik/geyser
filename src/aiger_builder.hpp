@@ -7,6 +7,7 @@
 #include <string>
 #include <expected>
 #include <exception>
+#include <unordered_set>
 
 namespace geyser::builder
 {
@@ -21,6 +22,17 @@ struct context
     variable_range state_vars;
     variable_range next_state_vars;
     variable_range and_vars;
+
+    // Aiger literals that are necessarily true. For any literal here, its
+    // negation aiger_not( lit ) is necessarily false. This is used to
+    // propagate constants and simplify the clausified formula.
+    std::unordered_set< aiger_literal > true_literals;
+
+    // The cone of influence of the error formula. Contains literals
+    // corresponding to the latches that are necessary to decide the value
+    // of the error literal. Any other latch x can have x' = false in the
+    // transition formula and this won't compromise correctness.
+    std::unordered_set< aiger_literal > error_coi;
 };
 
 inline literal from_aiger_lit( context& ctx, aiger_literal lit )

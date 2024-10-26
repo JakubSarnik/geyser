@@ -9,6 +9,7 @@
 #include <span>
 #include <concepts>
 #include <format>
+#include <random>
 
 namespace geyser::pdr
 {
@@ -142,6 +143,9 @@ class pdr : public engine
     int _queries = 0;
 
     cti_pool _ctis;
+
+    std::random_device _rd;
+    std::default_random_engine _rng{ _rd() };
 
     void refresh_solver();
 

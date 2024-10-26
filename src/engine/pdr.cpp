@@ -115,17 +115,29 @@ cti_handle pdr::get_predecessor( const proof_obligation& po )
     auto ins = _solver.get_model( _system->input_vars() );
     auto p = _solver.get_model( _system->state_vars() );
 
-    [[maybe_unused]]
-    const auto sat = with_solver()
-            .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
-            .assume( _transition_activator )
-            .assume( ins )
-            .assume( p )
-            .is_sat();
+    while ( true )
+    {
+        std::shuffle( p.begin(), p.end(), _rng );
 
-    assert( !sat );
+        [[maybe_unused]]
+        const auto sat = with_solver()
+                .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
+                .assume( _transition_activator )
+                .assume( ins )
+                .assume( p )
+                .is_sat();
 
-    return _ctis.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
+        assert( !sat );
+
+        const auto core = _solver.get_core( p );
+
+        if ( core == p )
+            break;
+
+        p = core;
+    }
+
+    return _ctis.make( cube{ std::move( p ) }, cube{ std::move( ins ) }, po.handle() );
 }
 
 std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< const literal > s, int level )
@@ -170,16 +182,29 @@ std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< c
 std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 {
     auto [ res_lits, res_level ] = generalize_from_core( _ctis.get( po.handle() ).state_vars().literals(), po.level() );
-    const auto all_lits = res_lits;
 
-    for ( const auto lit : all_lits )
+    auto done = false;
+
+    while ( !done )
     {
-        res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
+        auto all_lits = res_lits;
 
-        if ( intersects_initial_states( res_lits ) || !is_relative_inductive( res_lits, res_level ) )
-            res_lits.emplace_back( lit );
-        else
-            std::tie( res_lits, res_level ) = generalize_from_core( res_lits, res_level );
+        std::shuffle( all_lits.begin(), all_lits.end(), _rng );
+        done = true;
+
+        for ( const auto lit: all_lits )
+        {
+            res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end());
+
+            if ( intersects_initial_states( res_lits ) || !is_relative_inductive( res_lits, res_level ))
+                res_lits.emplace_back( lit );
+            else
+            {
+                std::tie( res_lits, res_level ) = generalize_from_core( res_lits, res_level );
+                done = false;
+                break;
+            }
+        }
     }
 
     while ( res_level <= depth() )

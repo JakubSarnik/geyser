@@ -118,15 +118,11 @@ class pdr : public engine
     const options* _opts;
     variable_store* _store;
 
-    solver _solver;
+    solver _basic_solver;
+    solver _trans_solver;
+    solver _error_solver;
+
     const transition_system* _system = nullptr;
-
-    literal _transition_activator;
-    literal _error_activator;
-
-    cnf_formula _activated_init; // This is activated by _trace[ 0 ].activator
-    cnf_formula _activated_trans;
-    cnf_formula _activated_error;
 
     // The cube corresponding to _init, which is assumed to be a single cube.
     cube _init_cube;
@@ -136,24 +132,7 @@ class pdr : public engine
     std::vector< cube_set > _trace_blocked_cubes;
     std::vector< literal > _trace_activators;
 
-    // How many solver queries to make before refreshing the solver to remove
-    // all the accumulated subsumed clauses.
-    constexpr static int solver_refresh_rate = 5000000;
-    int _queries = 0;
-
     cti_pool _ctis;
-
-    void refresh_solver();
-
-    solver::query_builder with_solver()
-    {
-        if ( _queries % solver_refresh_rate == 0 )
-            refresh_solver();
-
-        ++_queries;
-
-        return _solver.query();
-    }
 
     [[nodiscard]] int depth() const
     {
@@ -203,8 +182,7 @@ class pdr : public engine
 
 public:
     pdr( const options& opts, variable_store& store )
-        : _opts{ &opts }, _store{ &store }, _transition_activator{ _store->make() },
-          _error_activator{ _store->make() } {}
+        : _opts{ &opts }, _store{ &store } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;
 };

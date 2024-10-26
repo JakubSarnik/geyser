@@ -19,15 +19,22 @@ void pdr::initialize()
 {
     push_frame();
 
-    _activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
-    _activated_trans = _system->trans().activate( _transition_activator.var() );
-    _activated_error = _system->error().activate( _error_activator.var() );
-
     // We assume that initial states are given as a single cube. This is the
     // case when no invariant constraints are present in the Aiger input, which
     // we assume for the sake of simplicity of implementation.
 
     _init_cube = formula_as_cube( _system->init() );
+
+
+    const auto activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
+
+    _basic_solver.assert_formula( activated_init );
+
+    _trans_solver.assert_formula( activated_init );
+    _trans_solver.assert_formula( _system->trans() );
+
+    _error_solver.assert_formula( activated_init );
+    _error_solver.assert_formula( _system->error() );
 }
 
 result pdr::check()
@@ -55,12 +62,11 @@ result pdr::check()
 // input variable values.
 std::optional< cti_handle > pdr::get_error_cti()
 {
-    if ( with_solver()
+    if ( _error_solver.query()
          .assume( activators_from( depth() ) )
-         .assume( _error_activator )
          .is_sat() )
-        return _ctis.make( cube{ _solver.get_model( _system->state_vars() ) },
-                           cube{ _solver.get_model( _system->input_vars() ) } );
+        return _ctis.make( cube{ _error_solver.get_model( _system->state_vars() ) },
+                           cube{ _error_solver.get_model( _system->input_vars() ) } );
 
     return {};
 }
@@ -112,20 +118,19 @@ std::optional< counterexample > pdr::solve_obligation( const proof_obligation& s
 cti_handle pdr::get_predecessor( const proof_obligation& po )
 {
     const auto& s = _ctis.get( po.handle() ).state_vars().literals();
-    auto ins = _solver.get_model( _system->input_vars() );
-    auto p = _solver.get_model( _system->state_vars() );
+    auto ins = _trans_solver.get_model( _system->input_vars() );
+    auto p = _trans_solver.get_model( _system->state_vars() );
 
     [[maybe_unused]]
-    const auto sat = with_solver()
+    const auto sat = _trans_solver.query()
             .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
-            .assume( _transition_activator )
             .assume( ins )
             .assume( p )
             .is_sat();
 
     assert( !sat );
 
-    return _ctis.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
+    return _ctis.make( cube{ _trans_solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
 }
 
 std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< const literal > s, int level )
@@ -134,7 +139,7 @@ std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< c
 
     for ( int i = level - 1; i <= depth(); ++i )
     {
-        if ( _solver.is_in_core( _trace_activators[ i ] ) )
+        if ( _trans_solver.is_in_core( _trace_activators[ i ] ) )
         {
             j = i;
             break;
@@ -144,7 +149,7 @@ std::pair< std::vector< literal >, int > pdr::generalize_from_core( std::span< c
     auto res_lits = std::vector< literal >{};
 
     for ( const auto lit : s )
-        if ( _solver.is_in_core( _system->prime( lit ) ) )
+        if ( _trans_solver.is_in_core( _system->prime( lit ) ) )
             res_lits.emplace_back( lit );
 
     if ( intersects_initial_states( res_lits ) )
@@ -241,7 +246,7 @@ bool pdr::is_already_blocked( const proof_obligation& po )
             if ( cube.subsumes( s ) )
                 return true;
 
-    return !with_solver()
+    return !_basic_solver.query()
             .assume( s.literals() )
             .assume( activators_from( po.level() ) )
             .is_sat();
@@ -262,10 +267,9 @@ bool pdr::is_relative_inductive( std::span< const literal > s, int i )
 {
     assert( i >= 1 );
 
-    return !with_solver()
+    return !_trans_solver.query()
             .constrain_not( s )
             .assume( activators_from( i - 1 ) )
-            .assume( _transition_activator )
             .assume_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
             .is_sat();
 }
@@ -298,7 +302,12 @@ void pdr::add_blocked_at( const cube& c, int level, int start_from /* = 1*/ )
     assert( k < _trace_activators.size() );
 
     _trace_blocked_cubes[ k ].emplace_back( c );
-    _solver.assert_formula( c.negate().activate( _trace_activators[ k ].var() ) );
+
+    const auto activated = c.negate().activate( _trace_activators[ k ].var() );
+
+    _basic_solver.assert_formula( activated );
+    _trans_solver.assert_formula( activated );
+    _error_solver.assert_formula( activated );
 }
 
 // Returns true if the system has been proven safe by finding an invariant.
@@ -328,24 +337,6 @@ bool pdr::propagate()
     log_trace_content();
 
     return false;
-}
-
-void pdr::refresh_solver()
-{
-    logger::log_line_loud( "Refreshing the solver after {} queries", _queries );
-
-    assert( _system );
-
-    _solver.reset();
-    _queries = 0;
-
-    _solver.assert_formula( _activated_init );
-    _solver.assert_formula( _activated_trans );
-    _solver.assert_formula( _activated_error );
-
-    for ( const auto& [ cubes, act ] : std::views::zip( _trace_blocked_cubes, _trace_activators ) )
-        for ( const auto& cube : cubes )
-            _solver.assert_formula( cube.negate().activate( act.var() ) );
 }
 
 // Returns true if cube contains only state variables. Used for assertions

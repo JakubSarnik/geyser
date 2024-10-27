@@ -285,7 +285,15 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
 
 cube car::generalize_blocked( const proof_obligation& po )
 {
-    auto core = _trans_solver.get_core( _system->next_state_vars() );
+    auto core = std::vector< literal >{};
+
+    for ( const auto lit : _cotrace.get( po.handle() ).state_vars().literals() )
+    {
+        const auto primed = _system->prime( lit );
+
+        if ( _trans_solver.is_in_core( primed ) )
+            core.push_back( primed );
+    }
 
     const auto thunk = [ & ]( std::span< const literal > assumptions )
     {
@@ -400,10 +408,11 @@ bool car::propagate()
                 if ( _opts.propagate_cores() )
                 {
                     // has_predecessor queries with c primed
-                    auto core = _trans_solver.get_core( _system->next_state_vars() );
+                    auto core = std::vector< literal >{};
 
-                    for ( auto& lit : core )
-                        lit = _system->unprime( lit );
+                    for ( const auto lit : c.literals() )
+                        if ( _trans_solver.is_in_core( _system->prime( lit ) ) )
+                            core.push_back( lit );
 
                     add_blocked_at( cube{ core }, i + 1 );
                 }

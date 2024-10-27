@@ -141,15 +141,11 @@ class car : public engine
     car_options _opts;
     variable_store* _store;
 
-    solver _solver;
+    solver _basic_solver;
+    solver _trans_solver;
+    solver _error_solver;
+
     const transition_system* _system = nullptr;
-
-    literal _transition_activator;
-    literal _error_activator;
-
-    cnf_formula _activated_init; // This is activated by _trace[ 0 ].activator
-    cnf_formula _activated_trans;
-    cnf_formula _activated_error;
 
     // The negation of the init formula. How it's build differs between forward
     // and backward modes.
@@ -162,9 +158,6 @@ class car : public engine
     std::vector< literal > _trace_activators;
     std::vector< handle_set > _cotrace_found_cubes;
 
-    constexpr static int solver_refresh_rate = 5000000;
-    int _queries = 0;
-
     // In principle, this engine shouldn't care about the direction. However,
     // there are still a few places where we need to care:
     //   1. Backward car needs to reverse counterexamples.
@@ -172,18 +165,6 @@ class car : public engine
     bool _forward;
 
     cotrace_pool _cotrace;
-
-    void refresh_solver();
-
-    solver::query_builder with_solver()
-    {
-        if ( _queries % solver_refresh_rate == 0 )
-            refresh_solver();
-
-        ++_queries;
-
-        return _solver.query();
-    }
 
     [[nodiscard]] int depth() const
     {
@@ -221,7 +202,7 @@ class car : public engine
     bool has_predecessor( std::span< const literal > s, int i );
     bad_cube_handle get_predecessor( const proof_obligation& po );
     cube generalize_blocked( const proof_obligation& po );
-    std::vector< literal > get_minimal_core( std::span< const literal > seed,
+    std::vector< literal > get_minimal_core( solver& solver, std::span< const literal > seed,
                                              std::invocable< std::span< const literal > > auto requery );
 
     bool propagate();
@@ -240,8 +221,7 @@ class car : public engine
 
 public:
     car( const options& opts, variable_store& store, bool forward )
-        : _opts{ opts }, _store{ &store }, _transition_activator{ _store->make() },
-          _error_activator{ _store->make() }, _forward{ forward } {}
+        : _opts{ opts }, _store{ &store }, _forward{ forward } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;
 };

@@ -20,33 +20,21 @@ void car::initialize()
     push_frame();
     push_coframe();
 
-    _activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
-    _activated_trans = _system->trans().activate( _transition_activator.var() );
-    _activated_error = _system->error().activate( _error_activator.var() );
-
     // In the backward mode, the initial formula is not in general a cube.
     if ( _forward )
         _init_negated = formula_as_cube( _system->init() ).negate();
     else
         _init_negated = negate_cnf( _system->init() );
-}
 
-void car::refresh_solver()
-{
-    logger::log_line_loud( "Refreshing the solver after {} queries", _queries );
+    const auto activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
 
-    assert( _system );
+    _basic_solver.assert_formula( activated_init );
 
-    _solver.reset();
-    _queries = 0;
+    _trans_solver.assert_formula( activated_init );
+    _trans_solver.assert_formula( _system->trans() );
 
-    _solver.assert_formula( _activated_init );
-    _solver.assert_formula( _activated_trans );
-    _solver.assert_formula( _activated_error );
-
-    for ( const auto& [ cubes, act ] : std::views::zip( _trace_blocked_cubes, _trace_activators ) )
-        for ( const auto& cube : cubes )
-            _solver.assert_formula( cube.negate().activate( act.var() ) );
+    _error_solver.assert_formula( activated_init );
+    _error_solver.assert_formula( _system->error() );
 }
 
 result car::check()
@@ -110,13 +98,12 @@ std::optional< bad_cube_handle > car::get_error_state()
 {
     assert( depth() < _trace_activators.size() );
 
-    if ( with_solver()
+    if ( _error_solver.query()
          .assume( _trace_activators[ depth() ] )
-         .assume( _error_activator )
          .is_sat() )
     {
-        const auto handle = _cotrace.make( cube{ _solver.get_model( _system->state_vars() ) },
-                                           cube{ _solver.get_model( _system->input_vars() ) });
+        const auto handle = _cotrace.make( cube{ _error_solver.get_model( _system->state_vars() ) },
+                                           cube{ _error_solver.get_model( _system->input_vars() ) });
 
         add_reaching_at( handle, 0 );
         return handle;
@@ -240,7 +227,7 @@ bool car::is_already_blocked( const proof_obligation& po )
         if ( c.subsumes( s ) )
             return true;
 
-    return !with_solver()
+    return !_basic_solver.query()
             .assume( _trace_activators[ po.level() ] )
             .assume( s.literals() )
             .is_sat();
@@ -252,17 +239,16 @@ bool car::has_predecessor( std::span< const literal > s, int i )
 {
     assert( i >= 1 );
 
-    return with_solver()
+    return _trans_solver.query()
             .assume( _trace_activators[ i - 1 ] )
-            .assume( _transition_activator )
             .assume_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
             .is_sat();
 }
 
 bad_cube_handle car::get_predecessor( const proof_obligation& po )
 {
-    auto ins = _solver.get_model( _system->input_vars() );
-    auto p = _solver.get_model( _system->state_vars() );
+    auto ins = _trans_solver.get_model( _system->input_vars() );
+    auto p = _trans_solver.get_model( _system->state_vars() );
 
     if ( _forward )
     {
@@ -272,9 +258,8 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
         {
             assert( is_state_cube( assumptions ) );
 
-            return with_solver()
+            return _trans_solver.query()
                     .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
-                    .assume( _transition_activator )
                     .assume( ins )
                     .assume( assumptions )
                     .is_sat();
@@ -284,10 +269,10 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
         const auto sat = query( p );
         assert( !sat );
 
-        auto core = _solver.get_core( p );
+        auto core = _trans_solver.get_core( p );
 
         if ( _opts.get_muc_predecessor() )
-            core = get_minimal_core( core, query );
+            core = get_minimal_core( _trans_solver, core, query );
 
         return _cotrace.make( cube{ std::move( core ) }, cube{ std::move( ins ) }, po.handle() );
     }
@@ -300,21 +285,20 @@ bad_cube_handle car::get_predecessor( const proof_obligation& po )
 
 cube car::generalize_blocked( const proof_obligation& po )
 {
-    auto core = _solver.get_core( _system->next_state_vars() );
+    auto core = _trans_solver.get_core( _system->next_state_vars() );
 
     const auto thunk = [ & ]( std::span< const literal > assumptions )
     {
         assert( is_next_state_cube( assumptions ) );
 
-        return with_solver()
+        return _trans_solver.query()
                 .assume( _trace_activators[ po.level() - 1 ] )
-                .assume( _transition_activator )
                 .assume( assumptions )
                 .is_sat();
     };
 
     if ( _opts.get_muc_blocked() )
-        core = get_minimal_core( core, thunk );
+        core = get_minimal_core( _trans_solver, core, thunk );
 
     for ( auto& lit : core )
         lit = _system->unprime( lit );
@@ -322,7 +306,7 @@ cube car::generalize_blocked( const proof_obligation& po )
     return cube{ std::move( core ) };
 }
 
-std::vector< literal > car::get_minimal_core( std::span< const literal > seed,
+std::vector< literal > car::get_minimal_core( solver& solver, std::span< const literal > seed,
                                               std::invocable< std::span< const literal > > auto requery )
 {
     auto core = std::vector< literal >( seed.begin(), seed.end() );
@@ -335,7 +319,7 @@ std::vector< literal > car::get_minimal_core( std::span< const literal > seed,
         if ( requery( core ) )
             core.push_back( lit );
         else
-            core = _solver.get_core( core );
+            core = solver.get_core( core );
     }
 
     return core;
@@ -389,7 +373,12 @@ void car::add_blocked_at( const cube& c, int level )
     assert( level < _trace_activators.size() );
 
     frame.emplace_back( c );
-    _solver.assert_formula( c.negate().activate( _trace_activators[ level ].var() ) );
+
+    const auto activated = c.negate().activate( _trace_activators[ level ].var() );
+
+    _basic_solver.assert_formula( activated );
+    _trans_solver.assert_formula( activated );
+    _error_solver.assert_formula( activated );
 }
 
 bool car::propagate()
@@ -411,7 +400,7 @@ bool car::propagate()
                 if ( _opts.propagate_cores() )
                 {
                     // has_predecessor queries with c primed
-                    auto core = _solver.get_core( _system->next_state_vars() );
+                    auto core = _trans_solver.get_core( _system->next_state_vars() );
 
                     for ( auto& lit : core )
                         lit = _system->unprime( lit );

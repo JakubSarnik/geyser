@@ -19,32 +19,18 @@ void icar::initialize()
 {
     push_frame();
 
-    _activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
-    _activated_trans = _system->trans().activate( _transition_activator.var() );
-    _activated_error = _system->error().activate( _error_activator.var() );
-
     _init_negated = formula_as_cube( _system->init() ).negate();
-}
 
-void icar::refresh_solver()
-{
-    logger::log_line_loud( "Refreshing the solver after {} queries", _queries );
+    const auto activated_init = _system->init().activate( _trace_activators[ 0 ].var() );
+    const auto activated_error = _system->error().activate( _error_activator.var() );
 
-    assert( _system );
+    // In iCAR, the basic solver is used even for the error formula, since
+    // we cannot activate it permanently either way.
+    _basic_solver.assert_formula( activated_init );
+    _basic_solver.assert_formula( activated_error );
 
-    _solver.reset();
-    _queries = 0;
-
-    _solver.assert_formula( _activated_init );
-    _solver.assert_formula( _activated_trans );
-    _solver.assert_formula( _activated_error );
-
-    for ( const auto& [ cubes, act ] : std::views::zip( _trace_blocked_cubes, _trace_activators ) )
-        for ( const auto& cube : cubes )
-            _solver.assert_formula( cube.negate().activate( act.var() ) );
-
-    for ( const auto& [ handle, act ] : _cotrace_found_cubes )
-        add_blocked_to_solver( handle, act );
+    _trans_solver.assert_formula( activated_init );
+    _trans_solver.assert_formula( _system->trans() );
 }
 
 void icar::add_blocked_to_solver( bad_cube_handle h, literal act )
@@ -65,7 +51,7 @@ void icar::add_blocked_to_solver( bad_cube_handle h, literal act )
     for ( const auto lit : c.literals() )
         cnf.add_clause( !act, lit );
 
-    _solver.assert_formula( cnf );
+    _basic_solver.assert_formula( cnf );
 }
 
 result icar::check()
@@ -105,10 +91,10 @@ std::optional< bad_cube_handle > icar::get_error_state()
     for ( const auto& [ _, act ] : _cotrace_found_cubes )
         constraint.push_back( act );
 
-    if ( with_solver()
-            .assume( _trace_activators[ depth() ] )
-            .constrain_clause( constraint )
-            .is_sat() )
+    if ( _basic_solver.query()
+         .assume( _trace_activators[ depth() ] )
+         .constrain_clause( constraint )
+         .is_sat() )
     {
         // Find the bad cube that was used. The first activator is special as
         // it denotes a new error state. A new error state (i.e. a state
@@ -118,11 +104,11 @@ std::optional< bad_cube_handle > icar::get_error_state()
         const auto handle = [ & ]
         {
             for ( std::size_t i = 1; i < constraint.size(); ++i )
-                if ( _solver.is_true_in_model( constraint[ i ].var() ) )
+                if ( _basic_solver.is_true_in_model( constraint[ i ].var() ) )
                     return _cotrace_found_cubes[ i - 1 ].first;
 
-            return _cotrace.make( cube{ _solver.get_model( _system->state_vars() ) },
-                                  cube{ _solver.get_model( _system->input_vars() ) } );
+            return _cotrace.make( cube{ _basic_solver.get_model( _system->state_vars() ) },
+                                  cube{ _basic_solver.get_model( _system->input_vars() ) } );
         }();
 
         return handle;
@@ -216,7 +202,7 @@ bool icar::is_already_blocked( const proof_obligation& po )
         if ( c.subsumes( s ) )
             return true;
 
-    return !with_solver()
+    return !_basic_solver.query()
             .assume( _trace_activators[ po.level() ] )
             .assume( s.literals() )
             .is_sat();
@@ -226,9 +212,8 @@ bool icar::has_predecessor( std::span< const literal > s, int i )
 {
     assert( i >= 1 );
 
-    return with_solver()
+    return _trans_solver.query()
             .assume( _trace_activators[ i - 1 ] )
-            .assume( _transition_activator )
             .assume_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
             .is_sat();
 }
@@ -236,38 +221,44 @@ bool icar::has_predecessor( std::span< const literal > s, int i )
 bad_cube_handle icar::get_predecessor( const proof_obligation& po )
 {
     const auto& s = _cotrace.get( po.handle() ).state_vars().literals();
-    auto ins = _solver.get_model( _system->input_vars() );
-    auto p = _solver.get_model( _system->state_vars() );
+    auto ins = _trans_solver.get_model( _system->input_vars() );
+    auto p = _trans_solver.get_model( _system->state_vars() );
 
     [[maybe_unused]]
-    const auto sat = with_solver()
+    const auto sat = _trans_solver.query()
             .constrain_not_mapped( s, [ & ]( literal l ){ return _system->prime( l ); } )
-            .assume( _transition_activator )
             .assume( ins )
             .assume( p )
             .is_sat();
 
     assert( !sat );
 
-    return _cotrace.make( cube{ _solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
+    return _cotrace.make( cube{ _trans_solver.get_core( p ) }, cube{ std::move( ins ) }, po.handle() );
 }
 
 cube icar::generalize_blocked( const proof_obligation& po )
 {
-    auto core = _solver.get_core( _system->next_state_vars() );
+    auto core = std::vector< literal >{};
+
+    for ( const auto lit : _cotrace.get( po.handle() ).state_vars().literals() )
+    {
+        const auto primed = _system->prime( lit );
+
+        if ( _trans_solver.is_in_core( primed ) )
+            core.push_back( primed );
+    }
 
     const auto thunk = [ & ]( std::span< const literal > assumptions )
     {
         assert( is_next_state_cube( assumptions ) );
 
-        return with_solver()
+        return _trans_solver.query()
                 .assume( _trace_activators[ po.level() - 1 ] )
-                .assume( _transition_activator )
                 .assume( assumptions )
                 .is_sat();
     };
 
-    core = get_minimal_core( core, thunk );
+    core = get_minimal_core( _trans_solver, core, thunk );
 
     for ( auto& lit : core )
         lit = _system->unprime( lit );
@@ -275,8 +266,8 @@ cube icar::generalize_blocked( const proof_obligation& po )
     return cube{ std::move( core ) };
 }
 
-std::vector< literal > icar::get_minimal_core( std::span< const literal > seed,
-                                              std::invocable< std::span< const literal > > auto requery )
+std::vector< literal > icar::get_minimal_core( solver& solver, std::span< const literal > seed,
+                                               std::invocable< std::span< const literal > > auto requery )
 {
     auto core = std::vector< literal >( seed.begin(), seed.end() );
     const auto lits = core;
@@ -288,7 +279,7 @@ std::vector< literal > icar::get_minimal_core( std::span< const literal > seed,
         if ( requery( core ) )
             core.push_back( lit );
         else
-            core = _solver.get_core( core );
+            core = solver.get_core( core );
     }
 
     return core;
@@ -324,7 +315,11 @@ void icar::add_blocked_at( const cube& c, int level )
     assert( level < _trace_activators.size() );
 
     frame.emplace_back( c );
-    _solver.assert_formula( c.negate().activate( _trace_activators[ level ].var() ) );
+
+    const auto activated = c.negate().activate( _trace_activators[ level ].var() );
+
+    _basic_solver.assert_formula( activated );
+    _trans_solver.assert_formula( activated );
 }
 
 bool icar::propagate()
@@ -344,10 +339,11 @@ bool icar::propagate()
             else
             {
                 // has_predecessor queries with c primed
-                auto core = _solver.get_core( _system->next_state_vars() );
+                auto core = std::vector< literal >{};
 
-                for ( auto& lit : core )
-                    lit = _system->unprime( lit );
+                for ( const auto lit : c.literals() )
+                    if ( _trans_solver.is_in_core( _system->prime( lit ) ) )
+                        core.push_back( lit );
 
                 add_blocked_at( cube{ core }, i + 1 );
             }

@@ -101,15 +101,12 @@ class icar : public engine
     icar_options _opts;
     variable_store* _store;
 
-    solver _solver;
+    solver _basic_solver;
+    solver _trans_solver;
+
     const transition_system* _system = nullptr;
 
-    literal _transition_activator;
     literal _error_activator;
-
-    cnf_formula _activated_init;
-    cnf_formula _activated_trans;
-    cnf_formula _activated_error;
 
     cnf_formula _init_negated;
 
@@ -125,21 +122,6 @@ class icar : public engine
     // solver!
     std::vector< std::pair< bad_cube_handle, literal > > _cotrace_found_cubes;
     cotrace_pool _cotrace;
-
-    constexpr static int solver_refresh_rate = 5000000;
-    int _queries = 0;
-
-    void refresh_solver();
-
-    solver::query_builder with_solver()
-    {
-        if ( _queries % solver_refresh_rate == 0 )
-            refresh_solver();
-
-        ++_queries;
-
-        return _solver.query();
-    }
 
     [[nodiscard]] int depth() const
     {
@@ -167,7 +149,7 @@ class icar : public engine
     bool has_predecessor( std::span< const literal > s, int i );
     bad_cube_handle get_predecessor( const proof_obligation& po );
     cube generalize_blocked( const proof_obligation& po );
-    std::vector< literal > get_minimal_core( std::span< const literal > seed,
+    std::vector< literal > get_minimal_core( solver& solver, std::span< const literal > seed,
                                              std::invocable< std::span< const literal > > auto requery );
 
     bool propagate();
@@ -184,8 +166,7 @@ class icar : public engine
 
 public:
     icar( const options& opts, variable_store& store )
-            : _opts{ opts }, _store{ &store }, _transition_activator{ _store->make() },
-              _error_activator{ _store->make() } {}
+            : _opts{ opts }, _store{ &store }, _error_activator{ _store->make() } {}
 
     [[nodiscard]] result run( const transition_system& system ) override;
 };

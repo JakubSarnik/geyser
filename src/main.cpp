@@ -38,8 +38,6 @@ std::unique_ptr< engine > get_engine( const options& opts, variable_store& store
 
 void print_help()
 {
-    // TODO: Describe all engines and options
-
     std::cout << "Geyser symbolic model checker\n"
                  "Usage: run-geyser -e=<engine> [-v | --verbose] [arguments] <input.aig>\n\n";
 
@@ -47,17 +45,29 @@ void print_help()
                  "  * bmc  - simple bounded model checking\n"
                  "  * pdr  - property directed reachability\n"
                  "  * car  - complementary approximate reachability\n"
-                 "  * bcar - backward variant of CAR\n\n";
+                 "  * bcar - backward variant of CAR\n"
+                 "  * icar - alternative implementation of forward CAR using CaDiCaL's\n"
+                 "           constrain API\n\n";
 
     std::cout << "Further arguments may be passed to the various engines:\n"
                  "  * bmc\n"
                  "    * -k=<bound> to limit bmc depth\n"
                  "  * pdr - no options at the moment\n"
                  "  * car\n"
-                 "    * --no-propagate-cores - make propagation work as in PDR instead of\n"
-                 "      propagating unsat cores\n"
-                 "    * --repush - after blocking a proof obligation, try to return to it\n"
-                 "      again in the next frame (as in PDR)\n";
+                 "    * --no-propagate-cores - propagate blocked cubes as-is, without computation\n"
+                 "                             of further unsat cores\n"
+                 "    * --repush             - after blocking a proof obligation, try returning to"
+                 "                             it again in the next frame (as in PDR)\n"
+                 "    * --no-blocked-muc     - don't compute minimal unsat cores in generalization\n"
+                 "                             of blocked states, use the cores returned by the\n"
+                 "                             solver directly\n"
+                 "    * --no-predecessor-muc - similar to --no-blocked-muc, but for predecessor\n"
+                 "                             generalization instead\n"
+                 "    * --no-cotrace         - don't generalize error states by the use of the\n"
+                 "                             cotrace\n"
+                 "  * bcar - same as for car, but --no-predecessor-muc has no effect\n"
+                 "  * icar\n"
+                 "    * --no-cotrace - don't generalize error states by the use of the cotrace\n";
 }
 
 } // namespace <anonymous>

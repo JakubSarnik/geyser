@@ -274,7 +274,12 @@ std::vector< literal > icar::get_minimal_core( solver& solver, std::span< const 
 
     for ( const auto lit : lits )
     {
-        core.erase( std::remove( core.begin(), core.end(), lit ), core.end() );
+        const auto it = std::remove( core.begin(), core.end(), lit );
+
+        if ( it == core.end() )
+            continue;
+
+        core.erase( it, core.end() );
 
         if ( requery( core ) )
             core.push_back( lit );

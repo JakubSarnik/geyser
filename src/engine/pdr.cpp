@@ -179,7 +179,12 @@ std::pair< cube, int > pdr::generalize_inductive( const proof_obligation& po )
 
     for ( const auto lit : all_lits )
     {
-        res_lits.erase( std::remove( res_lits.begin(), res_lits.end(), lit ), res_lits.end() );
+        const auto it = std::remove( res_lits.begin(), res_lits.end(), lit );
+
+        if ( it == res_lits.end() )
+            continue;
+
+        res_lits.erase( it, res_lits.end() );
 
         if ( intersects_initial_states( res_lits ) || !is_relative_inductive( res_lits, res_level ) )
             res_lits.emplace_back( lit );

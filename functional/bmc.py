@@ -11,7 +11,7 @@ HWMCC2010 = path.expanduser("~/workbench/geyser/benchmarks/hwmcc/2010")
 BOUND = 20
 TIMEOUT_SECS = 60
 
-# TODO: Remove -m from aiger command once running AIGER 1.9
+# Remove -m from aiger command if running AIGER 1.9!
 GEYSER_CMD = f"{GEYSER_PATH} -e=bmc -k={BOUND} $aiger"
 AIGBMC_CMD = f"{AIGBMC_PATH} $aiger -m {BOUND}"
 

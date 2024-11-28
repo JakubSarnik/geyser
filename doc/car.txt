@@ -32,10 +32,10 @@ not cumulative, so if c is in F_i, we only know that no state described by c
 is reachable in exactly i steps from I. We store F in a vector, and we further
 store activation variables for each frame in vector Act.
 
-We use the notation R_i to mean -F_i. Similarly to PDR, the solver is informed
-about the contents of the trace so that adding c to F_i also adds the clause -c
-activated by Act_i to the solver. Asserting R_i in the solver thus amounts to
-assuming Act_i.
+We use the notation R_i to mean -F_i. Similarly to PDR, the solvers are
+informed about the contents of the trace so that adding c to F_i also adds the
+clause -c activated by Act_i to the solvers. Asserting R_i in the solver thus
+amounts to assuming Act_i.
 
 As in PDR, the first frame is semantically equal to the set of initial states.
 Implementation-wise, F_0 exists only virtually and is kept empty throughout
@@ -56,11 +56,10 @@ implementation doesn't actually store B_0 explicitly (there can, of course, be
 extremely many bad states), but instead stores it lazily, adding a cube there
 whenever we find out that F_k /\ E is satisfiable.
 
-Similarly to PDR, our solver always contains the transition relation T and the
-error formula E, activated by ActT and ActE, respectively. The inductiveness
-check requires special care (that is, clausification of disjunctions) and
-cannot be efficiently handled by the incremental API. As such, the check uses
-a special ad hoc solver initialized anew each time we perform it.
+The inductiveness check requires special care (that is, clausification of
+disjunctions) and cannot be efficiently handled by the incremental API. As
+such, the check uses a special ad hoc solver initialized anew each time we
+perform the check after a propagation phase.
 
 The pseudocode follows. It is at times heavily inspired by our implementation
 of PDR and uses the same conventions.
@@ -76,9 +75,15 @@ car() -> result:
 
   # Note that k is |F| - 1 and l is |B| - 1.
 
-  solver.add_formula( I.activated_by( Act[ 0 ] ) )
-  solver.add_formula( T.activated_by( ActT ) )
-  solver.add_formula( E.activated_by( ActE ) )
+  initial = I.activated_by( Act[ 0 ] )
+
+  basic_solver.add_formula( init )
+
+  trans_solver.add_formula( init )
+  trans_solver.add_formula( T )
+
+  error_solver.add_formula( init )
+  error_solver.add_formula( E )
 
   loop:
 
@@ -143,11 +148,10 @@ enumerate_bad_states() -> list[cube * int]:
   # obligation gets solved, it might lead to the second (or any further)
   # cube d being blocked at k (i.e. R_k /\ d is no longer satisfiable). We
   # should make sure to filter those out.
-  # TODO: SimpleCAR seems to answer this with a syntactic check only?
 
   for j in l .. 0:
     for c in B[ j ]:
-      if solver.assume( Act[ k ], literals( c ) ).is_sat():
+      if basic_solver.assume( Act[ k ], literals( c ) ).is_sat():
         yield < c, j >
 
   # After trying out all the cubes we have already stored in the cotrace, we
@@ -155,16 +159,14 @@ enumerate_bad_states() -> list[cube * int]:
   # them as well. Note that B_0 represents bad states lazily and the states
   # satisfying R_k /\ E are a certain subset of bad states.
 
-  while solver.assume( Act[ k ], ActE ).is_sat():
+  while error_solver.assume( Act[ k ] ).is_sat():
 
-    # TODO: SimpleCAR seems to do partial state generalization here as well.
-    s = solver.get_model().filter( is_state_variable )
+    s = error_solver.get_model().filter( is_state_variable )
     add_reaching_at( s, 0 )
 
     yield < s, 0 >
 
 
-# TODO: We don't need to pass k' here, do we? See also pdr.txt.
 solve_obligation( < s, k', j' > : cube * int * int ) -> result:
   assert 0 <= k' <= k
   assert 0 <= j' <= l
@@ -201,7 +203,7 @@ solve_obligation( < s, k', j' > : cube * int * int ) -> result:
     # Is R_{i - 1} /\ T /\ c' satisfiable? Note the lack of -c, in contrast
     # to PDR. We can no longer speak about relatively inductive clauses.
 
-    if solver.assume( Act[ i - 1 ], ActT, literals( c' ) ).is_sat():
+    if trans_solver.assume( Act[ i - 1 ], literals( c' ) ).is_sat():
 
       # There is indeed a predecessor of c in R_{i - 1}. We employ the same
       # generalization technique here as in PDR. In addition, we know that we
@@ -251,10 +253,6 @@ propagate() -> propagate_result:
   # invariant by checking emptiness of a frame. Instead, we have to track
   # whether we have indeed pushed every cube from F_i to F_{i + 1}.
 
-  # TODO: We need not always start from 1, but it suffices to start from the
-  #       minimal level that was pushed to since the last propagation occurred
-  #       (also in PDR).
-
   for i in 1 .. ( k - 1 ):
     pushed_all = true
 
@@ -269,11 +267,11 @@ propagate() -> propagate_result:
       # of s in R_i such that t /\ s' would be a model of the formula). Hence,
       # we can safely add c as blocked in frame i + 1.
 
-      if solver.assume( Act[ i ], ActT, literals( c' ) ).is_sat():
+      if trans_solver.assume( Act[ i ], literals( c' ) ).is_sat():
         pushed_all = false
       else:
-        # TODO: CAR seems to add only those literals in c that appeared in the
-        #       unsat core, but SimpleCAR doesn't seem to really do this.
+        # CAR seems to add only those literals in c that appeared in the unsat
+        # core, but SimpleCAR doesn't seem to really do this?
 
         add_blocked_at( c, i + 1 )
 
@@ -412,7 +410,7 @@ is_already_blocked( < c, i > : cube * int ) -> bool:
     if subsumes( d, c ):
       return true
 
-  return not solver.assume( literals( c ), Act[ i ] ).is_sat()
+  return not basic_solver.assume( literals( c ), Act[ i ] ).is_sat()
 
 
 add_blocked_at( c : cube, i : int ):
@@ -427,7 +425,12 @@ add_blocked_at( c : cube, i : int ):
       F[ i ].remove( d )
 
   F[ i ].push_cube( c )
-  solver.add_clause( ( -c ).activated_by( Act[ i ] ) )
+
+  clause = ( -c ).activated_by( Act[ m ] )
+
+  basic_solver.add_clause( clause )
+  trans_solver.add_clause( clause )
+  error_solver.add_clause( clause )
 
 
 add_reaching_at( c : cube, i : int ):
@@ -478,19 +481,19 @@ generalize_predecessor( s : cube ) -> cube:
   # generalization in such a case.
 
   if T_not_functional():
-    return sat_get_model().filter( is_state_variable )
+    return trans_solver.get_model().filter( is_state_variable )
 
   assert s.all( fun lit => var( lit ).is_state_variable )
 
   # Note that this function must be called before a different sat call is made.
 
-  ins = sat_get_model().filter( is_input_variable )
-  p = sat_get_model().filter( is_state_variable )
+  ins = trans_solver.get_model().filter( is_input_variable )
+  p = trans_solver.get_model().filter( is_state_variable )
 
   # We know that T /\ ins /\ p /\ -s' is unsatisfiable, we want to get its
   # core.
 
-  b = solver.constrain( -s' ).assume( ActT, ins, p ).is_sat()
+  b = trans_solver.constrain( -s' ).assume( ins, p ).is_sat()
   assert not b
 
   # The other important difference is that instead of returning just the core
@@ -501,10 +504,12 @@ generalize_predecessor( s : cube ) -> cube:
   # the original part of the formula from which we computed the core seed and
   # queries the solver.
 
-  core = solver.core().filter( fun lit => var( lit ).is_state_variable )
-  thunk = fun ( a ) => solver.constrain( -s' ).assume( ActT, ins, a ).is_sat()
+  core = trans_solver.core().filter( fun lit => var( lit ).is_state_variable )
 
-  return get_minimal_core( core, thunk )
+  thunk = fun ( a ) =>
+    trans_solver.constrain( -s' ).assume( ins, a ).is_sat()
+
+  return get_minimal_core( trans_solver, core, thunk )
 
 
 generalize_blocked( c : cube, i : int ) -> cube:
@@ -518,16 +523,18 @@ generalize_blocked( c : cube, i : int ) -> cube:
   # generalization algorithm above - minimal unsat cores. We simply want to
   # add a minimal subset d of c that still has no predecessors in R_{i - 1}.
 
-  core = solver.core().filter( fun lit => var( lit ).is_next_state_variable )
-  thunk = fun ( a ) => solver.assume( Act[ i - 1 ], ActT, a ).is_sat()
+  core = trans_solver.core()
+           .filter( fun lit => var( lit ).is_next_state_variable )
+  thunk = fun ( a ) => trans_solver.assume( Act[ i - 1 ], a ).is_sat()
 
-  # TODO: SimpleCAR seemingly tries to make the resulting core not intersect
-  #       the initial states. Why?
+  # NOTE: SimpleCAR seemingly tries to make the resulting core not intersect
+  #       the initial states? This seems to emulate PDR-style generalization?
 
-  return get_minimal_core( core, thunk ).map( fun lit => lit.unprime() )
+  return get_minimal_core( trans_solver, core, thunk )
+          .map( fun lit => lit.unprime() )
 
 
-get_minimal_core( seed : cube, requery : cube -> bool ) -> cube:
+get_minimal_core( slv : solver, seed : cube, requery : cube -> bool ) -> cube:
 
   # We made a SAT query, found it to be unsatisfiable and the core returned
   # from the solver (more specifically, the part of the core which includes the
@@ -551,6 +558,6 @@ get_minimal_core( seed : cube, requery : cube -> bool ) -> cube:
       # one. Furthermore, we can ask the solver about its new unsat core, which
       # might be even smaller than our 'smaller'.
 
-      core = smaller.filter( fun lit => solver.core().contains( lit ) )
+      core = smaller.filter( fun lit => slv.core().contains( lit ) )
 
   return core

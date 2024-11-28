@@ -293,8 +293,8 @@ generalize_predecessor( s : cube ) -> cube:
 
   # Note that this function must be called before a different sat call is made.
 
-  ins = sat_get_model().filter( is_input_variable )
-  p = sat_get_model().filter( is_state_variable )
+  ins = trans_solver.get_model().filter( is_input_variable )
+  p = trans_solver.get_model().filter( is_state_variable )
 
   # Query SAT( T /\ ins /\ p /\ -s' ). We know this is unsatisfiable, since
   # the transition relation is "functional" in the sense that there is exactly

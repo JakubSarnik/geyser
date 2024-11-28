@@ -4,13 +4,14 @@ Geyser is a simple symbolic model checker for propositional transition system
 systems. Its goal is to be a testbed for various model checking algorithms,
 mainly property directed reachability (PDR), complementary approximate
 reachability (CAR), and variants of thereof. The code is part of my master's
-thesis at the Faculty of Informatics, Masaryk University.
+thesis at the Faculty of Informatics, Masaryk University, whose topic was to
+compare PDR with CAR.
 
 The model checker works with input models given in the format Aiger 1.9
-(https://fmv.jku.at/aiger/) with several restrictions. Justice properties and
-fairness constraints are not and will not be supported. Invariance constraints
-and multiple outputs are as of now also unsupported. The output is similarly
-reported according to the counterexample syntax of Aiger 1.9.
+(https://fmv.jku.at/aiger/) with several restrictions: justice properties,
+fairness constraints, invariance constraints and multiple outputs are not
+supported. The output is similarly reported according to the counterexample
+syntax of Aiger 1.9.
 
 ## Compilation and usage
 
@@ -39,14 +40,30 @@ enables verbose printing of progress and other information.
 Currently, the following algorithms are implemented:
 - Property directed reachability (`pdr`) 
 - Complementary approximate reachability (`car`)
+- Alternative implementation of CAR using CaDiCaL's "constrain" API (`icar`)
 - Simple bounded model checking (`bmc`)
-  - To limit the maximal length of the trace, pass an argument of the form
-    `-k=<num>`.
 - Naive backward CAR (`bcar`)
+
+Some of the engines (mostly the CAR variants) support various options that
+mostly enable or disable various parts. These are described in the output of
+the help command `./run-geyser --help`.
+
+## Structure of the repository
+
+The code itself is located under the `src` directory. Third-party code (see
+below) can be found in `dep`. Some explanations of the algorithms is found in
+`doc`, although the contents were mostly written before the code itself and may
+be out of date (although we tried to keep at least the most important
+algorithmic aspects synchronised). The folder `test` contains some quick unit
+tests, and the folder `functional` contains tests that were relevant mostly on
+my computer (they run the tool and compare it with aiger bmc etc., but contain
+some absolute paths that must be changed and depend on aiger tools being
+available).
 
 ## Third-party code
 
 The repository contains a copy of CaDiCaL SAT solver by Armin Biere et al. (in
 `dep/cadical`) and a part of his Aiger library for manipulating and-inverter
-graphs (`dep/aiger`). Additionally, Catch2 is included for testing (`dep/catch2`).
-See the respective directories for licenses of third-party code.
+graphs (`dep/aiger`). Additionally, Catch2 is included for unit testing
+purposes (`dep/catch2`). See the respective directories for licenses of
+third-party code.

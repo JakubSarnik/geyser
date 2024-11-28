@@ -31,10 +31,14 @@ informed about the contents of the frames as follows: Whenever we add a new
 cube c to F_i, the clause -c_i (-c activated by Act_i) is added to the solver.
 We can then solve with R_i activated by assuming literals Act_i through Act_k.
 
-In order to do everything using a single solver, we also need to variously
-activate or deactivate formulas T and E. Thus, we also have activation
-variables ActT and ActE. The solver is initially loaded by both formulas
-activated by their respective variables.
+Originally, we tried to do everything using a single solver, so we had
+activation literals ActT and ActE and solved with, say, T in the formula by
+activating ActT. This turned out to be too slow. We guess that "hiding" T
+behind an activation literal prohibits many potential simplifications that
+the solver can do while preprocessing the formula. As such, we use three
+different solvers: trans_solver, which is always loaded with T, error_solver,
+which contains E, and basic_solver, which contains neither. Each solver has
+its own copy of the trace, as described above.
 
 The pseudocode is given below. Note several conventions:
   * |X| is the size of the collection X
@@ -49,20 +53,26 @@ pdr() -> result:
 
   # Note that k is |F| - 1.
 
-  # Fill the solver by the transition system's CNF specification. Note that the
-  # first frame is handled separately - F[ 0 ] is kept empty and Act[ 0 ]
+  # Fill the solvers by the transition system's CNF specification. Note that
+  # the first frame is handled separately - F[ 0 ] is kept empty and Act[ 0 ]
   # activates the initial formula.
 
-  solver.add_formula( I.activated_by( Act[ 0 ] ) )
-  solver.add_formula( T.activated_by( ActT ) )
-  solver.add_formula( E.activated_by( ActE ) )
+  initial = I.activated_by( Act[ 0 ] )
+
+  basic_solver.add_formula( init )
+
+  trans_solver.add_formula( init )
+  trans_solver.add_formula( T )
+
+  error_solver.add_formula( init )
+  error_solver.add_formula( E )
 
   loop:
 
     # This implements SAT( R[ k ] /\ E ) query.
 
-    while solver.assume( Act[ k ], ActE ).is_sat():
-      s = solver.get_model().filter( is_state_variable )
+    while error_solver.assume( Act[ k ] ).is_sat():
+      s = error_solver.get_model().filter( is_state_variable )
 
       if solve_obligation( < s, k > ) == counterexample:
 
@@ -106,7 +116,7 @@ solve_obligation( < s, k' > : cube * int ) -> result:
     # clause will disappear once the query is finished). This API is provided
     # by CaDiCaL.
 
-    if solver
+    if trans_solver
          .constrain( -c )
          .assume( literals( c' ), Act[ i - 1 ], ..., Act[ k ] )
          .is_sat():
@@ -144,8 +154,9 @@ solve_obligation( < s, k' > : cube * int ) -> result:
       add_blocked_at( d, j )
 
       # If we had to block c at some level i and succeeded, it might make sense
-      # to block it even later in the trace. This is a heuristic that works
-      # well in many situations, apparently.
+      # to block it even later in the trace. As such, we repush the obligation
+      # to a higher level. This is a heuristic that works well in many
+      # situations, apparently.
 
       if i < k:
         Q.add( < c, i + 1 > )
@@ -169,9 +180,9 @@ propagate() -> propagate_result:
       # or, in Bradley's terminology, if c is inductive relative to F[ i ]).
       # This holds iff SAT( R[ i ] /\ -c /\ T /\ c' ) is false.
 
-      if not solver
+      if not trans_solver
                .constrain( -c )
-               .assume( ActT, literals( c' ), Act[ i ], ..., Act[ k ] )
+               .assume( literals( c' ), Act[ i ], ..., Act[ k ] )
                .is_sat():
 
         # Beware here that add_blocked_at will actually remove the cube c
@@ -217,7 +228,7 @@ is_already_blocked( < c, i > : cube * int ) -> bool:
   # SAT( R[ i ] /\ c ). This formula is satisfiable if and only if the
   # entailment R[ i ] |= -c fails.
 
-  return not solver.assume( literals( c ), Act[ i ], ..., Act[ k ] ).is_sat()
+  return not basic_solver.assume( literals( c ), Act[ i ], ..., Act[ k ] ).is_sat()
 
 
 add_blocked_at( c : cube, i : int ):
@@ -241,11 +252,15 @@ add_blocked_at( c : cube, i : int ):
 
   F[ m ].push_cube( c )
 
-  # Now add the cube also to the solver. We cannot remove subsumed clauses in
+  # Now add the cube also to the solvers. We cannot remove subsumed clauses in
   # the solver, but the solver may actually do something about them in its
-  # internals, and we can reset the solver once every X SAT queries.
+  # internals (and we could reset the solver once every X SAT queries).
 
-  solver.add_clause( ( -c ).activated_by( Act[ m ] ) )
+  clause = ( -c ).activated_by( Act[ m ] )
+
+  basic_solver.add_clause( clause )
+  trans_solver.add_clause( clause )
+  error_solver.add_clause( clause )
 
 
 subsumes( c : cube, d : cube ) -> bool:
@@ -287,7 +302,7 @@ generalize_predecessor( s : cube ) -> cube:
   # this specific situation, we know that p leads to s under ins, hence it
   # cannot lead to any state in -s.
 
-  b = solver.constrain( -s' ).assume( ActT, ins, p ).is_sat()
+  b = trans_solver.constrain( -s' ).assume( ins, p ).is_sat()
   assert not b
 
   # Since the query is not satisfiable, an unsat core is available. This core
@@ -296,7 +311,7 @@ generalize_predecessor( s : cube ) -> cube:
   # s under ins. We have no guarantee that q is a proper subcube of p, but we
   # hope that in many practical situations, it may be (significantly) smaller.
 
-  return solver.core().filter( fun lit => var( lit ).is_state_variable )
+  return trans_solver.core().filter( fun lit => var( lit ).is_state_variable )
 
 
 generalize_inductive( c : cube, i : int ) -> cube * int:
@@ -314,6 +329,63 @@ generalize_inductive( c : cube, i : int ) -> cube * int:
   # so that it contains more states by dropping some literals from it. Further,
   # we may actually find that -c is inductive relative to even some further
   # frame.
+
+  # The first step is to use the information we have available in the unsat
+  # core resulting from the previous SAT query R[ i - 1 ] /\ -c /\ T /\ c'.
+
+  < d, j > = generalize_from_core( c, i )
+
+  # At this point, we have a (hopefully proper) subclause d of c such that d
+  # is inductive relative to R[ j ]. That is
+  #   * I /\ d is unsatisfiable,
+  #   * R[ j ] /\ -d /\ T /\ d' is unsatisfiable.
+  # We now try to generalize it further by removing even those literals that
+  # might have been in the core (note that the core is a "best effort"
+  # information, there is no guarantee about its quality or even minimality).
+  #
+  # To that end, we try to drop each literal that has so far remained in d.
+  # If it causes any of the two aforementioned formulas to become satisfiable,
+  # we simply put it back.
+
+  # Beware that this is an iteration through a changing collection, the code
+  # must solve this.
+
+  for lit in literals( d ):
+    d.remove_literal( lit )
+
+    intersects_initial =
+      basic_solver.assume( Act[ 0 ], literals( d ) ).is_sat()
+    has_predecessor =
+      trans_solver.constrain( -d )
+            .assume( literals( d ), Act[ j ], ..., Act[ k ] )
+
+    if intersects_initial or has_predecessor:
+      d.add_literal( lit )
+    else:
+      # We know that R[ j ] /\ -d /\ T /\ d' is unsatisfiable, we can again
+      # generalize from the core here and drop more than just lit. And possibly
+      # even raise the level.
+
+      < d, j > = generalize_from_core( d, j )
+
+  # Now for the final touch. We will try to increase the level of d yet again,
+  # this time going beyond the information we were able to extract from the
+  # core (just as we did for the cube). We will simply try to increase j until
+  # d is no longer inductive relative to it (or until we reach k).
+
+  while j < k && trans_solver
+                   .constrain( -d )
+                   .assume( literals( d ), Act[ j + 1 ], ..., Act[ k ] ):
+    j = j + 1
+
+  # We return the level at which to block d, which is one more than the level
+  # to which it is relative inductive.
+
+  return < d, j + 1 >
+
+
+generalize_from_core( c : cube, i : int ) -> cube * int:
+  assert 1 <= i <= k
 
   # In fact, let's first use the unsat core of the last query to cheaply raise
   # the level. Since the query was SAT( R[ i - 1 ] /\ -c /\ T /\ c' ), we had
@@ -334,67 +406,27 @@ generalize_inductive( c : cube, i : int ) -> cube * int:
   j = k
 
   for jj in ( i - 1 ) .. k:
-    if solver.core().contains( jj ):
+    if trans_solver.core().contains( jj ):
       j = jj
       break
 
-  # Now we may start the proper dropping of literals. First, note that we can
-  # again make use of the core. If we look at the subcube d of c such that d
-  # consists of exactly those literals of c that are in the core, we see that
-  # R[ i - 1 ] /\ -d /\ T /\ d', and hence by the previous also
-  # R[ j ] /\ -d /\ T /\ d', must still be unsatisfiable. However, while our
-  # obligation solving algorithm guarantees that I |= -c, this may not hold
-  # for an arbitrary subcube of c (and as such, our d might not really be
-  # inductive relative to R[ j ] anymore). Hence, we try to drop non-core
-  # literals one by one, and if we find that I /\ d (i.e. I |\= -d), we return
-  # the offending literal back.
+  # We can now use the core to drop some literals from c. If we look at the
+  # subcube d of c such that d consists of exactly those literals of c that
+  # are in the core, we see that R[ i - 1 ] /\ -d /\ T /\ d', and hence by the
+  # previous also R[ j ] /\ -d /\ T /\ d', must still be unsatisfiable.
+  # However, while our obligation solving algorithm guarantees that I |= -c,
+  # this may not hold for an arbitrary subcube of c (and as such, our d might
+  # not really be inductive relative to R[ j ] anymore). Hence, we try to add
+  # literals of c back to d until we get a supercube of the original core that
+  # also guarantees disjointness with the initial states.
 
-  d = c
-
-  for lit in literals( c ):
-    if not solver.core().contains( lit' ):
-      d.remove_literal( lit )
-
-      if solver.assume( Act[ 0 ], literals( d ) ).is_sat():
-        d.add_literal( lit )
-
-  # At this point, we have a (hopefully proper) subclause d of c such that d
-  # is inductive relative to R[ j ]. That is
-  #   * I /\ d is unsatisfiable,
-  #   * R[ j ] /\ -d /\ T /\ d' is unsatisfiable.
-  # We now try to generalize it further by removing even those literals that
-  # might have been in the core (note that the core is a "best effort"
-  # information, there is no guarantee about its quality or even minimality).
-  #
-  # To that end, we again try to drop each literal that has so far remained
-  # in d. If it causes any of the two aforementioned formulas to become
-  # satisfiable, we simply put it back.
-
-  # Beware that this is an iteration through a changing collection, the code
-  # must solve this.
-
-  for lit in literals( d ):
-    d.remove_literal( lit )
-
-    intersects_initial = solver.assume( Act[ 0 ], literals( d ) ).is_sat()
-    has_predecessor =
-      solver.constrain( -d )
-            .assume( ActT, literals( d ), Act[ j ], ..., Act[ k ] )
-
-    if intersects_initial or has_predecessor:
+  if basic_solver.assume( Act[ 0 ], literals( d ) ).is_sat():
+    for lit in literals( c ):
       d.add_literal( lit )
 
-  # Now for the final touch. We will try to increase the level of d yet again,
-  # this time going beyond the information we were able to extract from the
-  # core (just as we did for the cube). We will simply try to increase j until
-  # d is no longer inductive relative to it (or until we reach k).
+      if not basic_solver.assume( Act[ 0 ], literals( d ) ).is_sat():
+        break
 
-  while j < k && solver
-                   .constrain( -d )
-                   .assume( ActT, literals( d ), Act[ j + 1 ], ..., Act[ k ] ):
-    j = j + 1
+  # We return a cube d such that -d is inductive relative to j,
 
-  # We return the level at which to block d, which is one more than the level
-  # to which it is relative inductive.
-
-  return < d, j + 1 >
+  return < d, j >

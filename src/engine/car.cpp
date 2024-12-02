@@ -317,25 +317,24 @@ cube car::generalize_blocked( const proof_obligation& po )
 std::vector< literal > car::get_minimal_core( solver& solver, std::span< const literal > seed,
                                               std::invocable< std::span< const literal > > auto requery )
 {
-    auto core = std::vector< literal >( seed.begin(), seed.end() );
-    const auto lits = core;
+    auto rem = std::vector< literal >( seed.begin(), seed.end() );
+    auto muc = std::vector< literal >{};
 
-    for ( const auto lit : lits )
+    while ( !rem.empty() )
     {
-        const auto it = std::remove( core.begin(), core.end(), lit );
+        const auto lit = rem.back();
+        rem.pop_back();
 
-        if ( it == core.end() )
-            continue;
+        auto assumptions = rem;
+        assumptions.insert( assumptions.end(), muc.begin(), muc.end() );
 
-        core.erase( it, core.end() );
-
-        if ( requery( core ) )
-            core.push_back( lit );
+        if ( requery( assumptions ) )
+            muc.push_back( lit );
         else
-            core = solver.get_core( core );
+            rem = solver.get_core( rem );
     }
 
-    return core;
+    return muc;
 }
 
 void car::add_reaching_at( bad_cube_handle h, int level )
